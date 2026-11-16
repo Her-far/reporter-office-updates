@@ -1,0 +1,23 @@
+{
+  "product": "electimes-office",
+  "platform": "win32-x64",
+  "version": "1.0.0",
+  "build": 100,
+  "minBuild": 1,
+  "maxBuild": 99,
+  "notes": [
+    "시그니처 네이비 기본 테마와 설정의 10개 테마 선택을 제공합니다.",
+    "기자오피스 0.12.5.35의 편집 기능과 누적 온라인 업데이트를 유지합니다.",
+    "회사 로고, 설치 및 제거 화면, Windows 아이콘을 적용했습니다."
+  ],
+  "installer": {
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.0/ElectimesOffice-Setup-1.0.0-x64.exe",
+    "size": 584212156,
+    "sha256": "4f54d793567be9e1a7bd987a4df01cb40a995297b1df9c58538c8631d4862429"
+  },
+  "fullInstaller": {
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.0/ElectimesOffice-Setup-1.0.0-x64.exe",
+    "size": 584212156,
+    "sha256": "4f54d793567be9e1a7bd987a4df01cb40a995297b1df9c58538c8631d4862429"
+  }
+}
