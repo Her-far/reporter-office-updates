@@ -1,0 +1,72 @@
+name: Electimes Office 1.0.5 DOC reopening fix
+on:
+  push:
+    paths: ['.github/workflows/electimes-105.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging and test tools
+        shell: pwsh
+        working-directory: electimes-105
+        run: |
+          choco install nsis --yes --no-progress
+          npm install --no-save --ignore-scripts playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Test tool installation failed' }
+      - name: Reconstruct verified application
+        shell: pwsh
+        working-directory: electimes-105
+        run: |
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          curl.exe --fail --location --retry 3 -o base.exe https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.4/ElectimesOffice-Setup-1.0.4-x64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Base download failed' }
+          python rebuild.py --stage-only
+          if ($LASTEXITCODE -ne 0) { throw 'Reconstruction failed' }
+      - name: Test DOC close and reopen through recent list and file drop
+        shell: pwsh
+        working-directory: electimes-105
+        run: |
+          node doc-reopen.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'DOC reopening regression failed' }
+      - name: Package Windows installers
+        shell: pwsh
+        working-directory: electimes-105
+        run: |
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          python rebuild.py
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+      - name: Test native install, upgrade, registration and startup
+        shell: pwsh
+        working-directory: electimes-105
+        run: ./smoke.ps1
+      - name: Publish verified installers and feed
+        shell: pwsh
+        working-directory: electimes-105
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create electimes-v1.0.5 ElectimesOffice-Setup-1.0.5-x64.exe ElectimesOffice-Update-1.0.5-x64.exe ElectimesOffice-SHA256SUMS-1.0.5.txt windows-smoke.json doc-reopen-windows.json --title '전기신문 오피스 1.0.5' --notes-file release-notes.txt --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          Copy-Item electimes-latest.json ../electimes-latest.json
+          Set-Location ..
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add electimes-latest.json
+          git commit -m 'fix: publish Electimes Office 1.0.5 DOC reopening update'
+          git push
+          if ($LASTEXITCODE -ne 0) { throw 'Update feed publication failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-105-validation
+          path: |
+            electimes-105/windows-smoke.json
+            electimes-105/doc-reopen-windows.json
+            electimes-105/startup-stderr.txt
+            electimes-105/startup-stdout.txt
