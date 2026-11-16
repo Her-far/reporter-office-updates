@@ -1,22 +1,23 @@
 {
   "product": "electimes-office",
   "platform": "win32-x64",
-  "version": "1.0.5",
-  "build": 105,
+  "version": "1.0.6",
+  "build": 106,
   "minBuild": 103,
-  "maxBuild": 104,
+  "maxBuild": 105,
   "notes": [
-    "DOC 문서를 닫은 뒤 드래그하거나 최근 문서에서 다시 열 수 있도록 수정했습니다.",
-    "열려 있는 문서는 중복 변환 없이 활성화하고, 닫힌 문서의 임시 변환 파일을 정리합니다."
+    "업데이트 다운로드 중 Redirect was cancelled 오류를 수정했습니다.",
+    "1.0.5 이하에서 업데이트가 안 되면 이번 설치 파일을 직접 실행해 주세요.",
+    "다운로드 취소·재시도와 파일 크기·SHA-256 검증을 확인했습니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.5/ElectimesOffice-Update-1.0.5-x64.exe",
-    "size": 82030812,
-    "sha256": "bfe47810c3cc385182b38da296fbd8ad20521bc15a531ad64efae9d996108956"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.6/ElectimesOffice-Update-1.0.6-x64.exe",
+    "size": 82028558,
+    "sha256": "58e7654d1916196f93bca3694af45633928436408ba7823596ce2359a892b852"
   },
   "fullInstaller": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.5/ElectimesOffice-Setup-1.0.5-x64.exe",
-    "size": 206514270,
-    "sha256": "b764889217d97620e3e2d527f2176d4a25085924350b217c8c8ca15a2ef5de4c"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.6/ElectimesOffice-Setup-1.0.6-x64.exe",
+    "size": 206466579,
+    "sha256": "c75c2e9bf68e362c394ee078ad1c301c4c97476a399e336899598e50e8328ebc"
   }
 }
