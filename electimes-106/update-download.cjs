@@ -19,7 +19,7 @@ async function until(fn,what,timeout=30000){const end=Date.now()+timeout;while(D
   await welcome.waitFor({state:'visible',timeout:10000}).catch(()=>{});
   if(await welcome.isVisible())await welcome.getByRole('button',{name:/^Skip$|건너뛰기/}).click();
   await page.evaluate(()=>window.aiOffice.reporterUpdates.notifications(false));
-  const cache=await app.evaluate(({app})=>require('node:path').join(app.getPath('userData'),'electimes-updates'));
+  const cache=path.join(await app.evaluate(({app})=>app.getPath('userData')),'electimes-updates');
   for(const name of fs.readdirSync(cache))if(/\.(exe|partial)$/.test(name))fs.unlinkSync(path.join(cache,name));
   await app.evaluate(({session})=>{
     globalThis.__updateRedirects=[];globalThis.__updateRequests=0;
