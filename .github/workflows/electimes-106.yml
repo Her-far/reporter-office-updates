@@ -1,0 +1,79 @@
+name: Electimes Office 1.0.6 update redirect fix
+on:
+  push:
+    paths: ['.github/workflows/electimes-106.yml', 'electimes-106/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging and test tools
+        shell: pwsh
+        working-directory: electimes-106
+        run: |
+          choco install nsis --yes --no-progress
+          npm install --no-save --ignore-scripts playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Test tool installation failed' }
+      - name: Reconstruct verified application
+        shell: pwsh
+        working-directory: electimes-106
+        run: |
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          curl.exe --fail --location --retry 3 -o base.exe https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.5/ElectimesOffice-Setup-1.0.5-x64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Base download failed' }
+          python rebuild.py --stage-only
+          if ($LASTEXITCODE -ne 0) { throw 'Reconstruction failed' }
+      - name: Test DOC reopening from the selected Recent view and file drop
+        shell: pwsh
+        working-directory: electimes-106
+        run: |
+          node doc-reopen.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'DOC reopening regression failed' }
+      - name: Test real GitHub redirects, download, cancellation and retry in Electron
+        shell: pwsh
+        working-directory: electimes-106
+        run: |
+          node update-download.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Real update download regression failed' }
+      - name: Package Windows installers
+        shell: pwsh
+        working-directory: electimes-106
+        run: |
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          python rebuild.py
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+      - name: Test native install, upgrade, registration and startup
+        shell: pwsh
+        working-directory: electimes-106
+        run: ./smoke.ps1
+      - name: Publish verified installers and feed
+        shell: pwsh
+        working-directory: electimes-106
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create electimes-v1.0.6 ElectimesOffice-Setup-1.0.6-x64.exe ElectimesOffice-Update-1.0.6-x64.exe ElectimesOffice-SHA256SUMS-1.0.6.txt windows-smoke.json doc-reopen-windows.json update-download-windows.json --title '전기신문 오피스 1.0.6' --notes-file release-notes.txt --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          Copy-Item electimes-latest.json ../electimes-latest.json
+          Set-Location ..
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add electimes-latest.json
+          git commit -m 'fix: publish Electimes Office 1.0.6 update download redirect fix'
+          git push
+          if ($LASTEXITCODE -ne 0) { throw 'Update feed publication failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-106-validation
+          path: |
+            electimes-106/windows-smoke.json
+            electimes-106/doc-reopen-windows.json
+            electimes-106/startup-stderr.txt
+            electimes-106/startup-stdout.txt
+            electimes-106/update-download-windows.json
