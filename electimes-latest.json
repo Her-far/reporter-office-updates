@@ -1,24 +1,23 @@
 {
   "product": "electimes-office",
   "platform": "win32-x64",
-  "version": "1.0.1",
-  "build": 101,
+  "version": "1.0.2",
+  "build": 102,
   "minBuild": 1,
-  "maxBuild": 100,
+  "maxBuild": 101,
   "notes": [
-    "홈 탭 클립보드의 서식 복사 자리에 전체 선택(Ctrl+A)과 선택 상자 아이콘을 적용했습니다.",
-    "서식 복사는 붙여넣기 펼침 메뉴에서 계속 사용할 수 있습니다.",
-    "시그니처 네이비 기본값, 설정의 10개 테마 및 기존 편집 기능을 유지합니다.",
-    "처음 설치할 때부터 전용 업데이트 주소가 설정되며 이전 버전에서 한 번에 업데이트할 수 있습니다."
+    "Windows 보안에서 격리된 탐색기 미리보기 보조 파일을 설치 파일에서 제외했습니다.",
+    "탐색기 스페이스바 연동과 보조 파일 자동 재생성을 제거했으며 오피스 내부 미리보기는 유지합니다.",
+    "기존 설치 방식과 문서 편집 기능, 10개 테마, 전체 선택 버튼을 유지합니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.1/ElectimesOffice-Setup-1.0.1-x64.exe",
-    "size": 520794816,
-    "sha256": "16aba0cae0f1a85769b907a63f8bf713fd46766f24e8bcce5e241b7b9ec6c069"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.2/ElectimesOffice-Setup-1.0.2-x64.exe",
+    "size": 520794519,
+    "sha256": "6f4eb4d64f786af5b902f877113f851dff56f5dbacff43d5c01cd6c8b15259a0"
   },
   "fullInstaller": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.1/ElectimesOffice-Setup-1.0.1-x64.exe",
-    "size": 520794816,
-    "sha256": "16aba0cae0f1a85769b907a63f8bf713fd46766f24e8bcce5e241b7b9ec6c069"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.2/ElectimesOffice-Setup-1.0.2-x64.exe",
+    "size": 520794519,
+    "sha256": "6f4eb4d64f786af5b902f877113f851dff56f5dbacff43d5c01cd6c8b15259a0"
   }
 }
