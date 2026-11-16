@@ -22,4 +22,4 @@ await close();assert.deepEqual(fs.readFileSync(fixture),original);
 const ds=await app.evaluate(()=>globalThis.__docTestDialogs);assert.equal(ds.some(d=>d.type==='error'),false);
 const report={version:'1.0.5',platform:process.platform,packagedApp:true,realDocContentRendered:true,cycles:results,openDocumentReused:true,originalUnchanged:true,savePromptHandledByTest:true};
 fs.writeFileSync(path.join(root,'doc-reopen-windows.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
-})().catch(e=>{console.error(e);if(app){try{console.error('UI:',await(await app.firstWindow()).locator('body').innerText());console.error('Tabs:',await(await app.firstWindow()).evaluate(()=>window.aiOfficeTabs.list()));}catch{}}process.exitCode=1}).finally(async()=>{if(app)await app.close()});
+})().catch(async e=>{console.error(e);if(app){try{console.error('UI:',await(await app.firstWindow()).locator('body').innerText());console.error('Tabs:',await(await app.firstWindow()).evaluate(()=>window.aiOfficeTabs.list()));}catch{}}process.exitCode=1}).finally(async()=>{if(app)await app.close()});

@@ -1,7 +1,7 @@
 name: Electimes Office 1.0.5 DOC reopening fix
 on:
   push:
-    paths: ['.github/workflows/electimes-105.yml']
+    paths: ['.github/workflows/electimes-105.yml', 'electimes-105/**']
   workflow_dispatch:
 permissions:
   contents: write
