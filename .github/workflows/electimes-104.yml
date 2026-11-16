@@ -1,0 +1,54 @@
+name: Electimes Office 1.0.4 verified distribution
+on:
+  push:
+    paths: ['.github/workflows/electimes-104.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging tool
+        shell: pwsh
+        run: choco install nsis --yes --no-progress
+      - name: Reconstruct verified application and package
+        shell: pwsh
+        working-directory: electimes-104
+        run: |
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          curl.exe --fail --location --retry 3 -o base.exe https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.2/ElectimesOffice-Setup-1.0.2-x64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Base download failed' }
+          python rebuild.py
+          if ($LASTEXITCODE -ne 0) { throw 'Reconstruction failed' }
+      - name: Test native install, update, registration and startup
+        shell: pwsh
+        working-directory: electimes-104
+        run: ./smoke.ps1
+      - name: Publish verified installers and feed
+        shell: pwsh
+        working-directory: electimes-104
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create electimes-v1.0.4 ElectimesOffice-Setup-1.0.4-x64.exe ElectimesOffice-Update-1.0.4-x64.exe ElectimesOffice-SHA256SUMS-1.0.4.txt windows-smoke.json --title '전기신문 오피스 1.0.4' --notes-file release-notes.txt --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          Copy-Item electimes-latest.json ../electimes-latest.json
+          Set-Location ..
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add electimes-latest.json
+          git commit -m 'Publish Electimes Office 1.0.4 update channel'
+          git push
+          if ($LASTEXITCODE -ne 0) { throw 'Update feed publication failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-104-validation
+          path: |
+            electimes-104/windows-smoke.json
+            electimes-104/startup-stderr.txt
+            electimes-104/startup-stdout.txt
