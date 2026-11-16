@@ -27,7 +27,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Base download failed' }
           python rebuild.py --stage-only
           if ($LASTEXITCODE -ne 0) { throw 'Reconstruction failed' }
-      - name: Test DOC close and reopen through recent list and file drop
+      - name: Test DOC reopening from the selected Recent view and file drop
         shell: pwsh
         working-directory: electimes-105
         run: |
