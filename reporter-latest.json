@@ -1,0 +1,23 @@
+{
+  "product": "reporter-office",
+  "platform": "win32-x64",
+  "version": "0.12.5.35",
+  "build": 35,
+  "minBuild": 34,
+  "maxBuild": 34,
+  "notes": [
+    "설정에서 버전 확인, 업데이트 다운로드 및 재시작 설치를 지원합니다.",
+    "이전 버전은 전체 누적 업데이트로 최신 버전에 바로 도달할 수 있습니다.",
+    "0.12.5.34용 소형 설치 파일의 설치 취소 오류를 수정했습니다."
+  ],
+  "installer": {
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/v0.12.5.35/ReporterOffice-Update-0.12.5.35.exe",
+    "size": 7374791,
+    "sha256": "233e6071b2a3b9727fd9ba81a21f56bfd66d272e4089cedd75c017a6ac3be99e"
+  },
+  "fullInstaller": {
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/v0.12.5.35/ReporterOffice-FullUpdate-0.12.5.35.exe",
+    "size": 498740595,
+    "sha256": "480abc61576af5cf4bea45f1684a9b8617491149f30aefc27a9b1908d8931e72"
+  }
+}
