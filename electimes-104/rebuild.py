@@ -29,14 +29,18 @@ actual={p.relative_to(stage).as_posix():sha(p) for p in stage.rglob('*') if p.is
 assert actual==manifest['expected'],'Payload integrity mismatch'
 (pkg/'brand').mkdir(exist_ok=True)
 for name in ['electimes-office.ico','welcome.bmp','header.bmp']:shutil.copy2(root/name,pkg/'brand'/name)
-for p in root.glob('*.nsi'):shutil.copy2(p,pkg/p.name)
+for p in root.glob('*.nsi'):
+ script=p.read_text(encoding='utf-8-sig')
+ # Native Windows NSIS file searches require backslash-separated host paths.
+ script=script.replace('${WORK}/brand/','${WORK}\\brand\\').replace('${WORK}/','${WORK}\\').replace('${PAYLOAD}/*','${PAYLOAD}\\*')
+ (pkg/p.name).write_text(script,encoding='utf-8-sig')
 for p in root.glob('*.nsh'):shutil.copy2(p,pkg/p.name)
 patch=root/'patch'
 for rel in manifest['patchFiles']:
  p=patch/rel;p.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(stage/rel,p)
 nsis=os.environ['MAKENSIS']
 for kind,payload in [('Setup',stage),('Update',patch)]:
- cmd=[nsis,'/V2',f'/DWORK={pkg}',f'/DPAYLOAD={payload}',f'/DOUTPUT={root}/ElectimesOffice-{kind}-1.0.4-x64.exe']
+ cmd=[nsis,'/V2',f'/DWORK={pkg}',f'/DPAYLOAD={payload}',f'/DOUTPUT={root / ("ElectimesOffice-"+kind+"-1.0.4-x64.exe")}']
  if kind=='Update':cmd+=['/DPATCH']
  subprocess.run(cmd+[str(pkg/'setup-104.nsi')],check=True)
 notes=['스크롤할 때 이미 읽은 셀을 반복해서 지우고 다시 채우던 처리를 줄였습니다.','문서를 연 뒤 남던 파란 점선과 홈 로고 겹침을 수정하고 Office 표기를 적용했습니다.','업데이트 알림을 추가했습니다. 설정에서 끄거나 직접 업데이트를 확인할 수 있습니다.','Windows 기본 앱 목록 등록을 지원합니다. 설치판은 별도의 압축 해제 스크립트 없이 설치합니다.']
