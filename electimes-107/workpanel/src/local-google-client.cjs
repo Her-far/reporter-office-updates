@@ -34,6 +34,6 @@ async function importLocalGoogleClient({vault,resourcesPath,localAppData}){
       cleanup=true;return {status:'imported'};
     }
     cleanup=true;return {status:'missing'};
-  }finally{if(cleanup)await fs.rm(backup,{force:true}).catch(()=>{});}
+  }finally{if(cleanup)await rawFs.rm(backup,{force:true}).catch(()=>{});}
 }
 module.exports={importLocalGoogleClient,readArchiveClient};
