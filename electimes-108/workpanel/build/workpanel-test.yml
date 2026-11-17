@@ -1,0 +1,44 @@
+name: Electimes Office isolated WorkPanel TEST
+on:
+  push:
+    branches: ['test/electimes-workpanel-20261116']
+    paths: ['electimes-workpanel-test.zip', '.github/workflows/workpanel-test.yml']
+permissions:
+  contents: read
+concurrency:
+  group: workpanel-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prepare isolated test sources and tools
+        shell: pwsh
+        run: |
+          Expand-Archive electimes-workpanel-test.zip -DestinationPath workpanel-test
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          npm install --prefix workpanel-test --no-save --ignore-scripts resedit@3.1.1
+          if ($LASTEXITCODE -ne 0) { throw 'Resource editor installation failed' }
+      - name: Build independent installer
+        shell: pwsh
+        run: ./workpanel-test/build/build-windows.ps1
+      - name: Verify install, simultaneous startup, isolation and uninstall
+        shell: pwsh
+        run: ./workpanel-test/tests/windows-smoke.ps1 -BuildDirectory ./workpanel-test/dist
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ElectimesOffice-WorkPanel-Test
+          retention-days: 30
+          path: |
+            workpanel-test/dist/ElectimesOffice-WorkPanel-Test-Setup.exe
+            workpanel-test/dist/SHA256SUMS.txt
+            workpanel-test/dist/BUILD-VERIFICATION.json
+            workpanel-test/dist/windows-smoke.json
+            workpanel-test/dist/startup-*.txt

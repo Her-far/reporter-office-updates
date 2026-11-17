@@ -1,0 +1,15 @@
+.wp-menu-scroll{display:flex;align-items:stretch;flex:0 0 auto;width:100%;min-width:0;background:var(--color-bg-light);border-bottom:1px solid var(--ui-border-light)}
+.wp-menu-scroll>#menu-bar{flex:1 1 auto;min-width:0;max-width:100%;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;border-bottom:0;touch-action:pan-x}
+.wp-menu-scroll>#menu-bar::-webkit-scrollbar{display:none}
+.wp-menu-arrow{flex:0 0 26px;width:26px;padding:0;border:0;background:var(--color-bg-light);color:var(--color-primary-dark);cursor:pointer;font:inherit;font-size:17px}
+.wp-menu-arrow[hidden]{display:none}.wp-menu-arrow:disabled{opacity:.35;cursor:default}.wp-menu-arrow:hover:not(:disabled){background:var(--ui-accent-bg)}.wp-menu-arrow:focus-visible,#menu-bar:focus-visible{outline:2px solid var(--color-primary-dark);outline-offset:-2px}
+#menu-bar .menu-dropdown{position:fixed!important;max-width:calc(100vw - 8px);min-width:min(220px,calc(100vw - 8px));z-index:1005}
+#menu-bar .md-sub-panel{position:fixed!important;z-index:1006}
+.wp-autosave-slot{display:flex;align-items:center;flex:0 0 auto;padding:0 8px;border-left:1px solid var(--ui-border-light)}
+.wp-autosave-slot .autosave-toggle{position:relative;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap;font-size:11px;color:var(--color-text-main)}
+.wp-autosave-slot .autosave-toggle input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
+.wp-autosave-slot .autosave-knob{position:relative;width:26px;height:14px;border-radius:7px;background:#8793a5;flex:none}
+.wp-autosave-slot .autosave-knob::after{content:'';position:absolute;top:2px;left:2px;width:10px;height:10px;border-radius:50%;background:#fff}
+.wp-autosave-slot .autosave-toggle.on .autosave-knob{background:var(--color-primary-dark,#2856a9)}
+.wp-autosave-slot .autosave-toggle.on .autosave-knob::after{left:14px}
+.wp-autosave-slot .autosave-toggle:focus-within{outline:2px solid var(--color-primary-dark,#2856a9);outline-offset:3px;border-radius:2px}
