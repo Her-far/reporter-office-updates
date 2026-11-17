@@ -33,3 +33,11 @@ test('cancelled and failed relay authentication never saves a connection',async(
  const a=s.connect(false);const rejected=assert.rejects(a,/oauth-service-unavailable/);while(!opened)await new Promise(r=>setTimeout(r,5));const cb=new URL(opened.searchParams.get('redirect_uri'));cb.search=new URLSearchParams({state:opened.searchParams.get('state'),code:'fixture'});await fetch(cb);await rejected;assert.equal(writes,0);assert.equal(s.status().connected,false);
  opened=null;const b=s.connect(false);const cancelled=assert.rejects(b,/oauth-cancelled/);while(!opened)await new Promise(r=>setTimeout(r,5));s.cancel();await cancelled;assert.equal(writes,0);s.close();
 });
+test('disconnect during a refresh-token write cannot restore the removed account on restart',async()=>{
+ let release,writing;const gate=new Promise(r=>release=r),started=new Promise(r=>writing=r);
+ const store={'google-client':deployment,'google-token':{refreshToken:'old',refreshProof:'v1.'+'a'.repeat(43),scopes:READ_SCOPES}};
+ const vault={read:async n=>store[n]||null,write:async(n,v)=>{writing();await gate;store[n]=v;},remove:async n=>{delete store[n];}};
+ const service=new CalendarService({vault,deploymentClient:deployment,fetcher:async url=>url.endsWith('/revoke')?{ok:true}:{ok:true,json:async()=>({access_token:'a',refresh_token:'rotated',refresh_proof:'v1.'+'b'.repeat(43),expires_in:3600})}});
+ await service.init();const refresh=service.access();const rejected=assert.rejects(refresh,/oauth-cancelled/);await started;const disconnected=service.disconnect();release();await rejected;await disconnected;
+ assert.equal(service.token,null);assert.equal(store['google-token'],undefined);const restarted=new CalendarService({vault,deploymentClient:deployment});await restarted.init();assert.equal(restarted.status().connected,false);
+});

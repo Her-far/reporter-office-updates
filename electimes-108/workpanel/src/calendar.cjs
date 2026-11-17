@@ -7,18 +7,19 @@ class CalendarService {
   async configure(client){if(this.token||this.auth)throw Error('disconnect-first');await this.vault.write('google-client',client);this.client=client;}
   async connect(edit){if(!this.client)throw Error('desktop-client-required');if(this.auth)throw Error('oauth-busy');if(!await this.vault.available())throw Error('secure-storage-unavailable');
     const gen=this.generation;this.auth=authorize(this.client,{openExternal:this.openExternal,fetcher:this.fetcher,edit});this.onChange();
-    try{const token=await this.auth.promise;if(gen!==this.generation||this.closed)throw Error('oauth-cancelled');await this.vault.write('google-client',this.client);await this.vault.write('google-token',this.storedToken(token));this.token=token;this.syncError='';}finally{this.auth=null;this.onChange();}
+    try{const token=await this.auth.promise;if(gen!==this.generation||this.closed)throw Error('oauth-cancelled');await this.queueTokenWrite(async()=>{if(gen!==this.generation||this.closed)throw Error('oauth-cancelled');await this.vault.write('google-client',this.client);await this.vault.write('google-token',this.storedToken(token));});if(gen!==this.generation||this.closed)throw Error('oauth-cancelled');this.token=token;this.syncError='';}finally{this.auth=null;this.onChange();}
   }
+  queueTokenWrite(operation){const next=(this.tokenSaving||Promise.resolve()).catch(()=>{}).then(operation);this.tokenSaving=next;return next;}
   storedToken(token){return {refreshToken:token.refreshToken,scopes:token.scopes,...(token.refreshProof?{refreshProof:token.refreshProof}:{})};}
   cancel(){this.auth?.cancel();}
-  async disconnect(){this.generation++;this.auth?.cancel();const token=this.token;this.token=null;this.events=[];this.calendars=[];this.lastSync=null;this.syncError='';await this.vault.remove('google-token');this.onChange();
+  async disconnect(){this.generation++;this.auth?.cancel();const token=this.token;this.token=null;this.events=[];this.calendars=[];this.lastSync=null;this.syncError='';await this.queueTokenWrite(()=>this.vault.remove('google-token'));this.onChange();
     if(token?.refreshToken){try{await this.fetcher('https://oauth2.googleapis.com/revoke',{method:'POST',redirect:'error',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({token:token.refreshToken}).toString(),signal:AbortSignal.timeout(10000)});}catch{this.syncError='revoke-offline';}}
   }
   async access(){if(!this.token)throw Error('connect-first');if(this.token.accessToken&&this.token.expiresAt>Date.now()+60000)return this.token.accessToken;
     if(this.refreshing)return this.refreshing;const gen=this.generation,t=this.token;
     this.refreshing=(async()=>{const j=await tokenExchange(this.fetcher,this.client,{refresh_token:t.refreshToken,grant_type:'refresh_token',...(this.client.tokenEndpoint?{refresh_proof:t.refreshProof||''}:{})});if(gen!==this.generation||this.closed)throw Error('oauth-cancelled');if(!j.access_token)throw Error('reconnect-required');
       const next={...t,accessToken:j.access_token,expiresAt:Date.now()+Number(j.expires_in||3600)*1000};
-      if(j.refresh_token){if(this.client.tokenEndpoint&&!/^v1\.[A-Za-z0-9_-]{43}$/.test(j.refresh_proof||''))throw Error('oauth-failed');next.refreshToken=j.refresh_token;if(j.refresh_proof)next.refreshProof=j.refresh_proof;await this.vault.write('google-token',this.storedToken(next));}
+      if(j.refresh_token){if(this.client.tokenEndpoint&&!/^v1\.[A-Za-z0-9_-]{43}$/.test(j.refresh_proof||''))throw Error('oauth-failed');next.refreshToken=j.refresh_token;if(j.refresh_proof)next.refreshProof=j.refresh_proof;await this.queueTokenWrite(async()=>{if(gen!==this.generation||this.closed)throw Error('oauth-cancelled');await this.vault.write('google-token',this.storedToken(next));});}
       if(gen!==this.generation||this.closed)throw Error('oauth-cancelled');this.token=next;return j.access_token;})();
     try{return await this.refreshing;}finally{this.refreshing=null;}
   }
