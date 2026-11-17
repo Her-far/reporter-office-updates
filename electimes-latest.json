@@ -1,26 +1,24 @@
 {
   "product": "electimes-office",
   "platform": "win32-x64",
-  "version": "1.0.7",
-  "build": 107,
+  "version": "1.0.8",
+  "build": 108,
   "minBuild": 103,
-  "maxBuild": 106,
+  "maxBuild": 107,
   "notes": [
-    "AI·메일·구글 캘린더·메모 업무패널을 정식판에 통합했습니다.",
-    "첨부파일 기본 저장 폴더를 지정하고, 탭을 바꿔도 패널 너비를 유지합니다.",
-    "좁은 창에서도 상단 메뉴를 좌우로 이동할 수 있습니다.",
-    "자동저장 스위치를 메뉴 줄로 옮겨 문서 탭 아래의 빈 줄을 제거했습니다.",
-    "DOC 재열기와 업데이트 다운로드 오류 수정은 유지됩니다.",
-    "줄바꿈 표시 및 한자 후보창 취소 문제는 이번 버전에서 해결되지 않았습니다."
+    "구글 캘린더를 별도 설정 파일 없이 계정 로그인으로 연결합니다.",
+    "기존 연결과 DOC 재열기·패널·자동저장 개선은 유지합니다.",
+    "구글 앱 게시·검증은 별도 관리자 설정이며, 테스트 사용자 제한은 관리자가 해제해야 합니다.",
+    "줄바꿈 표시 및 한자 후보창 취소 문제는 아직 해결되지 않았습니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.7/ElectimesOffice-Setup-1.0.7-x64.exe",
-    "size": 295393065,
-    "sha256": "01c4ebae80a2d96e9ec87e4462158e8a37576e86edecec1d3f11f4a829f68c0c"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.8/ElectimesOffice-Setup-1.0.8-x64.exe",
+    "size": 295395324,
+    "sha256": "9609f2d5358965083f2c6c9d0e846bf9e4ccf51bb747144bb6d6d54c9e6ff9bd"
   },
   "fullInstaller": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.7/ElectimesOffice-Setup-1.0.7-x64.exe",
-    "size": 295393065,
-    "sha256": "01c4ebae80a2d96e9ec87e4462158e8a37576e86edecec1d3f11f4a829f68c0c"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.8/ElectimesOffice-Setup-1.0.8-x64.exe",
+    "size": 295395324,
+    "sha256": "9609f2d5358965083f2c6c9d0e846bf9e4ccf51bb747144bb6d6d54c9e6ff9bd"
   }
 }
