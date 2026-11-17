@@ -19,3 +19,5 @@ test('shared panel width is bounded, legacy mail width ignored; old agenda selec
  const p=settingsOf({menu:'schedule',defaultMenu:'schedule',mailWidth:900,mailZoom:0.85});assert.equal(p.menu,'notes');assert.equal(p.defaultMenu,'notes');assert.equal(p.width,400);assert.equal(p.mailWidth,undefined);assert.equal(p.mailZoom,0.85);assert.equal(DEFAULTS.width,400);assert.equal(DEFAULTS.panelWidthVersion,1);
  assert.equal(settingsOf({mailWidth:9999,mailZoom:100}).mailZoom,1.5);assert.equal(settingsOf({width:1,mailZoom:0}).width,300);
 });
+
+test('quit waits only while a note write is outstanding',async()=>{const dir=await fs.mkdtemp(path.join(os.tmpdir(),'wp-quit-'));try{const s=new NotesStore(path.join(dir,'notes.json'));await s.init();assert.equal(s.flushRequired,false);const pending=s.create();assert.equal(s.flushRequired,true);await pending;assert.equal(s.flushRequired,false);await s.flush();}finally{await fs.rm(dir,{recursive:true,force:true});}});

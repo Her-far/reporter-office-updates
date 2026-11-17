@@ -59,7 +59,8 @@ async function until(fn,what,timeout=30000){const end=Date.now()+timeout;while(D
   assert(report.redirects.some(x=>x.to==='release-assets.githubusercontent.com'));
   console.log(JSON.stringify(report));
 })().catch(async error=>{report.error=String(error);console.error(error);process.exitCode=1;if(app)try{console.error(await(await app.firstWindow()).locator('body').innerText())}catch{}}).finally(async()=>{
-  if(app)await app.close();
+  try{await require('./close-app.cjs')(app);}finally{
   fs.writeFileSync(metadata,originalMetadata);
   fs.writeFileSync(path.join(root,'update-download-windows.json'),JSON.stringify(report,null,2));
+  }
 });
