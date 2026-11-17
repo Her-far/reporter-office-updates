@@ -1,0 +1,16 @@
+node_modules/
+base.exe
+upgrade-base.exe
+base-installer/
+stage/
+package/
+installer-check/
+*.exe
+*-windows.json
+windows-smoke.json
+startup-*.txt
+download-fixture.json
+payload-manifest.json
+electimes-latest.json
+ElectimesOffice-SHA256SUMS-*.txt
+재열기 검증.doc
