@@ -1,0 +1,95 @@
+name: Electimes Office 1.0.7 work panel integration
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/electimes-107.yml', 'electimes-107/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: electimes-production-release
+  cancel-in-progress: false
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging and test tools
+        working-directory: electimes-107
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          npm install --no-save --ignore-scripts playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Test tools failed' }
+          npm ci --ignore-scripts --prefix workpanel
+          if ($LASTEXITCODE -ne 0) { throw 'Work panel dependencies failed' }
+          node --test workpanel/tests/core.test.cjs workpanel/tests/downloads.test.cjs workpanel/tests/mail-reader.test.cjs workpanel/tests/mail-reader-protocol.test.cjs workpanel/tests/notes.test.cjs workpanel/tests/migrate.test.cjs workpanel/tests/local-google-client.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Service regression failed' }
+      - name: Build public source on production 1.0.6
+        working-directory: electimes-107
+        shell: pwsh
+        run: |
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          curl.exe --fail --location --retry 3 -o base.exe https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.6/ElectimesOffice-Setup-1.0.6-x64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Base download failed' }
+          python rebuild.py --stage-only
+          if ($LASTEXITCODE -ne 0) { throw 'Reconstruction failed' }
+      - name: Verify real panel, migration and common width
+        working-directory: electimes-107
+        shell: pwsh
+        run: |
+          node workpanel-ui.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Native work panel regression failed' }
+      - name: Verify DOC close and reopen through Recent and drop
+        working-directory: electimes-107
+        shell: pwsh
+        run: |
+          node doc-reopen.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'DOC reopen regression failed' }
+      - name: Verify update redirect, cancellation, retry and checksum
+        working-directory: electimes-107
+        shell: pwsh
+        run: |
+          node update-download.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Update download regression failed' }
+      - name: Package and inspect installer
+        working-directory: electimes-107
+        shell: pwsh
+        run: |
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          python rebuild.py
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging failed' }
+          ./smoke.ps1
+      - name: Publish verified installer and update channel
+        working-directory: electimes-107
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create electimes-v1.0.7 ElectimesOffice-Setup-1.0.7-x64.exe ElectimesOffice-SHA256SUMS-1.0.7.txt windows-smoke.json doc-reopen-windows.json update-download-windows.json workpanel-windows.json --title '전기신문 Office 1.0.7 — 업무패널 통합' --notes-file release-notes.txt --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          # Update only the company channel; retain concurrent repository work.
+          $feed = Get-Content -Raw electimes-latest.json
+          Set-Location ..
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --ff-only origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Refresh channel head failed' }
+          $current = Get-Content -Raw electimes-latest.json | ConvertFrom-Json
+          if ($current.build -ge 107) { throw 'A newer or same release already owns the channel' }
+          [IO.File]::WriteAllText((Join-Path $PWD 'electimes-latest.json'), $feed, [Text.UTF8Encoding]::new($false))
+          git add electimes-latest.json
+          git commit -m 'release: publish Electimes Office 1.0.7 work panel integration'
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Update feed publication failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-107-validation
+          path: |
+            electimes-107/*-windows.json
+            electimes-107/windows-smoke.json
+            electimes-107/startup-*.txt
