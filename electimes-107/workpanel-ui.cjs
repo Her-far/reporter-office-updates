@@ -20,7 +20,7 @@ let app;async function until(fn,label){const end=Date.now()+45000;while(Date.now
  const welcome=page.locator('.onb-overlay');await welcome.waitFor({state:'visible',timeout:10000}).catch(()=>{});if(await welcome.isVisible())await welcome.getByRole('button',{name:/^Skip$|건너뛰기/}).click();
  console.log('Home ready, opening notes');await page.locator('.wp-toolbar [data-menu=notes]').click();console.log('Notes tab clicked');
  const getState=()=>app.evaluate(async({webContents})=>{const wc=webContents.getAllWebContents().find(w=>w.getURL().includes('/work-panel/index.html'));if(!wc)return null;try{return (await wc.executeJavaScript("workPanel.action('state')")).state}catch{return null}});
- const state=await until(async()=>{const s=await getState();return s?.notes?.length?s:null},'migrated notes');assert.equal(state.notes[0].body,notes.notes[0].body);assert.equal(state.calendar.configured,true);assert.equal(state.version,'1.0.7');
+ const state=await until(async()=>{const s=await getState();return s?.notes?.length?s:null},'migrated notes');assert.equal(state.notes[0].body,notes.notes[0].body);assert.equal(state.calendar.configured,true,JSON.stringify(state.calendar));assert.equal(state.version,'1.0.7');
  console.log('Migration verified');const widths=[];
  for(const menu of ['ai','mail','calendar','notes']){await page.locator('.wp-toolbar [data-menu='+menu+']').click();await until(async()=>await page.locator('.wp-dock').getAttribute('data-wp-menu')===menu,'tab '+menu);widths.push(await page.locator('.wp-dock').evaluate(e=>Math.round(e.getBoundingClientRect().width)));}
  assert.equal(new Set(widths).size,1);assert(!await page.locator('.wp-toolbar').innerText().then(t=>t.includes('TEST')));
