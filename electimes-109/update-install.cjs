@@ -7,7 +7,7 @@ const root=__dirname,fixture=JSON.parse(fs.readFileSync(path.join(root,'download
 const report={version:'1.0.9',realInstaller:true,realRestart:true,cases:[]};
 const powershell=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
 const quote=s=>"'"+s.replaceAll("'","''")+"'";
-function ps(script){return execFileSync(powershell,['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{encoding:'utf8',windowsHide:true,timeout:30000}).replace(/^\uFEFF/,'').trim()}
+function ps(script){script="[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); "+script;return execFileSync(powershell,['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{encoding:'utf8',windowsHide:true,timeout:30000}).replace(/^\uFEFF/,'').trim()}
 async function until(fn,label,ms=90000){const end=Date.now()+ms;while(Date.now()<end){const v=await fn();if(v)return v;await new Promise(r=>setTimeout(r,250))}throw Error('Timed out: '+label)}
 async function runCase(legacy){
  const target=fs.mkdtempSync(path.join(os.tmpdir(),legacy?'Electimes legacy update ':'전기신문 업데이트 '));
@@ -15,9 +15,10 @@ async function runCase(legacy){
  const metadata=path.join(target,'resources/electimes-version.json');
  if(!legacy)fs.writeFileSync(metadata,JSON.stringify({version:'1.0.6',build:106}));
  const exe=path.join(target,'Electimes Office.exe'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'electimes-install-profile-'));
- let app;const entry={client:legacy?'released-1.0.6':'fixed-1.0.9',simulatedBuild:106,targetBuild:108};report.cases.push(entry);
+ let app,child;const entry={client:legacy?'released-1.0.6':'fixed-1.0.9',simulatedBuild:106,targetBuild:108};report.cases.push(entry);
  try{
   app=await _electron.launch({executablePath:exe,args:[`--user-data-dir=${profile}`],env:{...process.env,GENOFFICE_NO_SPARE_VIEW:'1',GENOFFICE_LANG:'en'},timeout:60000});
+  child=app.process();
   const page=await app.firstWindow();await page.waitForFunction(()=>window.aiOffice?.reporterUpdates,{timeout:45000});
   const welcome=page.locator('.onb-overlay');await welcome.waitFor({state:'visible',timeout:10000}).catch(()=>{});
   if(await welcome.isVisible())await welcome.getByRole('button',{name:/^Skip$|건너뛰기/}).click();
@@ -29,15 +30,15 @@ async function runCase(legacy){
   await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].webContents.send('home:open-settings',{section:'about'}));
   await page.getByRole('button',{name:'업데이트 확인',exact:true}).click();
   const download=page.getByRole('button',{name:legacy?/^다운로드 및 업데이트 \(/:/^업데이트 다운로드 \(/});
-  const exited=new Promise(resolve=>app.process().once('exit',(code,signal)=>resolve({code,signal})));
+  const exited=new Promise(resolve=>child.once('exit',(code,signal)=>resolve({code,signal})));
   await download.click();
   if(!legacy){
    const restart=page.getByRole('button',{name:'재시작하여 업데이트',exact:true});await restart.waitFor({state:'visible'});
-   await new Promise(r=>setTimeout(r,5000));assert.equal(app.process().exitCode,null);
+   await new Promise(r=>setTimeout(r,5000));assert.equal(child.exitCode,null);
    entry.waitedWithoutQuitting=true;
    await restart.click();entry.explicitRestartClicked=true;
   }
-  const quit=await until(async()=>app.process().exitCode!==null?await exited:false,'client quit');assert.equal(quit.code,0);entry.quit=quit;
+  const quit=await until(async()=>child.exitCode!==null?await exited:false,'client quit');assert.equal(quit.code,0);entry.quit=quit;
   const result=await until(()=>{
    if(!fs.existsSync(resultFile))return false;
    try{return JSON.parse(fs.readFileSync(resultFile,'utf8').replace(/^\uFEFF/,''))}catch{return false}
@@ -53,7 +54,7 @@ async function runCase(legacy){
   console.log(JSON.stringify(entry));
  }catch(e){entry.error=String(e);throw e}
  finally{
-  if(app&&app.process().exitCode===null)await require('./close-app.cjs')(app).catch(()=>{});
+  if(app&&child?.exitCode===null)await require('./close-app.cjs')(app).catch(()=>{});
   ps(`$p = Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq ${quote(exe)} }; $p | ForEach-Object { [void]$_.CloseMainWindow() }; Start-Sleep -Seconds 2; Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq ${quote(exe)} } | Stop-Process -Force`);
  }
 }
