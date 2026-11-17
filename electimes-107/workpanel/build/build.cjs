@@ -37,6 +37,9 @@ if(process.env.PUBLIC_RELEASE==='1'&&oauthFile)throw Error('Public releases cann
 if(oauthFile){const {clientOf}=require('../src/oauth.cjs');const client=clientOf(JSON.parse(fs.readFileSync(oauthFile,'utf8')));rep.set('out/main/work-panel/google-client.json',Buffer.from(JSON.stringify({installed:client})));}
 Object.assign(pkg,{version:'1.0.7',electimesModificationNotice:'Work panel integration on production 1.0.6; DOC reopen and update redirect fixes retained. Original notices retained.'});rep.set('package.json',Buffer.from(JSON.stringify(pkg,null,2)));
 if(fs.existsSync(out))throw Error('Output already exists; select a new empty folder');fs.cpSync(base,out,{recursive:true});fs.rmSync(path.join(out,'$PLUGINSDIR'),{recursive:true,force:true});
+// Some 7-Zip versions reconstruct the base installer uninstaller.
+// NSIS generates the new version; never ship the previous generated executable as payload.
+for(const name of fs.readdirSync(out))if(/^uninstall\.exe$/i.test(name))fs.rmSync(path.join(out,name));
 fs.writeFileSync(path.join(out,'resources/app.asar'),asar.rewriteArchive(orig,rep));
 const modified=[];
 modified.push(require('./compact-autosave.cjs')(path.join(out,'resources/modules/hwp/renderer'),exact));

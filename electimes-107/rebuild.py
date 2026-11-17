@@ -41,7 +41,8 @@ subprocess.run(cmd,check=True)
 # Inspect the built setup and compare every shipped payload byte.
 extracted=root/'installer-check'
 subprocess.run([seven,'x',str(output),'-o'+str(extracted),'-y'],check=True,stdout=subprocess.DEVNULL)
-assert all(sha(extracted/rel)==digest for rel,digest in actual.items()),'Installer payload mismatch'
+mismatched=[rel for rel,digest in actual.items() if not (extracted/rel).is_file() or sha(extracted/rel)!=digest]
+assert not mismatched,'Installer payload mismatch: '+json.dumps(mismatched)
 notes=['AI·메일·구글 캘린더·메모 업무패널을 정식판에 통합했습니다.','첨부파일 기본 저장 폴더를 지정하고, 탭을 바꿔도 패널 너비를 유지합니다.','좁은 창에서도 상단 메뉴를 좌우로 이동할 수 있습니다.','자동저장 스위치를 메뉴 줄로 옮겨 문서 탭 아래의 빈 줄을 제거했습니다.','DOC 재열기와 업데이트 다운로드 오류 수정은 유지됩니다.','줄바꿈 표시 및 한자 후보창 취소 문제는 이번 버전에서 해결되지 않았습니다.']
 entry={'url':'https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.7/'+output.name,'size':output.stat().st_size,'sha256':sha(output)}
 feed={'product':'electimes-office','platform':'win32-x64','version':'1.0.7','build':107,'minBuild':103,'maxBuild':106,'notes':notes,'installer':entry,'fullInstaller':entry}
