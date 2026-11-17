@@ -82,3 +82,12 @@ test('mail login starts at official company authentication URL, owns external pr
 
  }finally{app.emit('before-quit');fs.rmSync(temp,{recursive:true,force:true});}
 });
+
+test('vault reads the asynchronous Electron decryption result object after restart',async()=>{
+ const d=await fs.mkdtemp(path.join(os.tmpdir(),'wp-async-vault-'));
+ try{
+  const c={isAsyncEncryptionAvailable:async()=>true,encryptStringAsync:async s=>Buffer.from(s).map(v=>v^0x5a),decryptStringAsync:async b=>({result:Buffer.from(b).map(v=>v^0x5a).toString(),shouldReEncrypt:false})};
+  await new Vault(d,c,'win32').write('google-client',{client_id:'fixture.apps.googleusercontent.com',client_secret:'test-only'});
+  const reopened=new Vault(d,c,'win32');assert.equal((await reopened.read('google-client')).client_secret,'test-only');assert.equal(await reopened.read('missing'),null);
+ }finally{await fs.rm(d,{recursive:true,force:true});}
+});

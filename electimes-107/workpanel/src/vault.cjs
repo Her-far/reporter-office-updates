@@ -4,7 +4,13 @@ class Vault {
   async available() { return (this.crypto.isAsyncEncryptionAvailable ? await this.crypto.isAsyncEncryptionAvailable() : this.crypto.isEncryptionAvailable()) && !(this.platform==='linux' && this.crypto.getSelectedStorageBackend?.()==='basic_text'); }
   async read(name) {
     if (!await this.available()) return null;
-    try { const b=await fs.readFile(path.join(this.dir,name+'.sealed'));return JSON.parse(this.crypto.decryptStringAsync ? await this.crypto.decryptStringAsync(b) : this.crypto.decryptString(b)); } catch(e) { if (e.code==='ENOENT') return null; throw Error('secure-storage-read'); }
+    try {
+      const b=await fs.readFile(path.join(this.dir,name+'.sealed'));
+      const decrypted=this.crypto.decryptStringAsync ? await this.crypto.decryptStringAsync(b) : this.crypto.decryptString(b);
+      const text=typeof decrypted==='string'?decrypted:decrypted?.result;
+      if(typeof text!=='string')throw Error('invalid-decryption-result');
+      return JSON.parse(text);
+    } catch(e) { if (e.code==='ENOENT') return null; throw Error('secure-storage-read'); }
   }
   async write(name,data) {
     if (!await this.available()) throw Error('secure-storage-unavailable');
