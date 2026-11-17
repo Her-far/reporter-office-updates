@@ -6,7 +6,7 @@ module.exports=async function closeTestApp(application){
  const exited=new Promise(resolve=>child.once('exit',(code,signal)=>resolve({code,signal})));
  try{
   await application.evaluate(({app,BrowserWindow},file)=>{
-   const fs=require('node:fs');const mark=s=>fs.appendFileSync(file,String(s)+'\n');
+   const fs=process.getBuiltinModule('fs');const mark=s=>fs.appendFileSync(file,String(s)+'\n');
    process.on('uncaughtExceptionMonitor',e=>mark('EXCEPTION '+e.stack));
    for(const name of ['before-quit','will-quit','quit','window-all-closed']){app.prependListener(name,()=>mark(name+':start'));app.on(name,e=>mark(name+':end prevented='+!!e?.defaultPrevented));}
    for(const w of BrowserWindow.getAllWindows()){w.on('close',e=>mark('window-close '+w.id+' prevented='+!!e.defaultPrevented));w.on('closed',()=>mark('window-closed'));}
