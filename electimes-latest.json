@@ -1,23 +1,26 @@
 {
   "product": "electimes-office",
   "platform": "win32-x64",
-  "version": "1.0.6",
-  "build": 106,
+  "version": "1.0.7",
+  "build": 107,
   "minBuild": 103,
-  "maxBuild": 105,
+  "maxBuild": 106,
   "notes": [
-    "업데이트 다운로드 중 Redirect was cancelled 오류를 수정했습니다.",
-    "1.0.5 이하에서 업데이트가 안 되면 이번 설치 파일을 직접 실행해 주세요.",
-    "다운로드 취소·재시도와 파일 크기·SHA-256 검증을 확인했습니다."
+    "AI·메일·구글 캘린더·메모 업무패널을 정식판에 통합했습니다.",
+    "첨부파일 기본 저장 폴더를 지정하고, 탭을 바꿔도 패널 너비를 유지합니다.",
+    "좁은 창에서도 상단 메뉴를 좌우로 이동할 수 있습니다.",
+    "자동저장 스위치를 메뉴 줄로 옮겨 문서 탭 아래의 빈 줄을 제거했습니다.",
+    "DOC 재열기와 업데이트 다운로드 오류 수정은 유지됩니다.",
+    "줄바꿈 표시 및 한자 후보창 취소 문제는 이번 버전에서 해결되지 않았습니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.6/ElectimesOffice-Update-1.0.6-x64.exe",
-    "size": 82028558,
-    "sha256": "58e7654d1916196f93bca3694af45633928436408ba7823596ce2359a892b852"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.7/ElectimesOffice-Setup-1.0.7-x64.exe",
+    "size": 295393065,
+    "sha256": "01c4ebae80a2d96e9ec87e4462158e8a37576e86edecec1d3f11f4a829f68c0c"
   },
   "fullInstaller": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.6/ElectimesOffice-Setup-1.0.6-x64.exe",
-    "size": 206466579,
-    "sha256": "c75c2e9bf68e362c394ee078ad1c301c4c97476a399e336899598e50e8328ebc"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.7/ElectimesOffice-Setup-1.0.7-x64.exe",
+    "size": 295393065,
+    "sha256": "01c4ebae80a2d96e9ec87e4462158e8a37576e86edecec1d3f11f4a829f68c0c"
   }
 }
