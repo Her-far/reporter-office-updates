@@ -1,0 +1,13 @@
+node_modules/
+base.exe
+base-installer/
+stage/
+package/
+installer-check/
+patch-check/
+patch-payload/
+*.exe
+*.zip
+*-windows.json
+windows-smoke.json
+payload-manifest.json
