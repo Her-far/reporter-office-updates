@@ -11,7 +11,11 @@ function ps(script){script="$ProgressPreference='SilentlyContinue'; [Console]::O
 async function until(fn,label,ms=90000){const end=Date.now()+ms;while(Date.now()<end){const v=await fn();if(v)return v;await new Promise(r=>setTimeout(r,250))}throw Error('Timed out: '+label)}
 async function runCase(legacy){
  const target=fs.mkdtempSync(path.join(os.tmpdir(),legacy?'Electimes legacy update ':'전기신문 업데이트 '));
- fs.cpSync(path.join(root,legacy?'base-installer':'stage'),target,{recursive:true});
+ const source=path.join(root,legacy?'base-installer':'stage');
+ assert(fs.existsSync(path.join(source,'resources/app.asar')),'Missing source payload: '+source);
+ // Copy the fixture with the Windows native tool, including Unicode paths.
+ try{execFileSync('robocopy.exe',[source,target,'/E','/R:1','/W:1','/NFL','/NDL','/NJH','/NJS','/NP'],{stdio:'pipe',timeout:120000})}catch(e){if(!(e.status>=0&&e.status<8))throw e}
+ assert(fs.existsSync(path.join(target,'resources/app.asar')),'Fixture copy failed: '+JSON.stringify({source,target,files:fs.readdirSync(target)}));
  const metadata=path.join(target,'resources/electimes-version.json');
  if(!legacy)fs.writeFileSync(metadata,JSON.stringify({version:'1.0.6',build:106}));
  const exe=path.join(target,'Electimes Office.exe'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'electimes-install-profile-'));

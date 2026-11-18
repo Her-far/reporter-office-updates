@@ -67,6 +67,13 @@ jobs:
         run: |
           node doc-reopen.cjs
           if ($LASTEXITCODE -ne 0) { throw 'DOC reopen regression failed' }
+      - name: Verify Find dismissal returns keyboard input to HWP and DOCX
+        timeout-minutes: 5
+        working-directory: electimes-109
+        shell: pwsh
+        run: |
+          node find-focus.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Find keyboard focus regression failed' }
       - name: Verify update download waits for explicit restart
         timeout-minutes: 6
         working-directory: electimes-109
@@ -99,7 +106,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create electimes-v1.0.9 ElectimesOffice-Setup-1.0.9-x64.exe ElectimesOffice-SHA256SUMS-1.0.9.txt windows-smoke.json doc-reopen-windows.json update-download-windows.json update-install-windows.json panel-layout-windows.json workpanel-windows.json google-connect-windows.json --title '전기신문 Office 1.0.9 — 업데이트 대기 및 패널 조작 수정' --notes-file release-notes.txt --latest=false
+          gh release create electimes-v1.0.9 ElectimesOffice-Setup-1.0.9-x64.exe ElectimesOffice-SHA256SUMS-1.0.9.txt windows-smoke.json doc-reopen-windows.json find-focus-windows.json update-download-windows.json update-install-windows.json panel-layout-windows.json workpanel-windows.json google-connect-windows.json --title '전기신문 Office 1.0.9 — 업데이트·패널·찾기 수정' --notes-file release-notes.txt --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
           # Update only the company channel; retain concurrent repository work.
           $feed = Get-Content -Raw electimes-latest.json

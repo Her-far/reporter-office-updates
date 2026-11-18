@@ -43,7 +43,7 @@ extracted=root/'installer-check'
 subprocess.run([seven,'x',str(output),'-o'+str(extracted),'-y'],check=True,stdout=subprocess.DEVNULL)
 mismatched=[rel for rel,digest in actual.items() if not (extracted/rel).is_file() or sha(extracted/rel)!=digest]
 assert not mismatched,'Installer payload mismatch: '+json.dumps(mismatched)
-notes=['다운로드가 끝나도 종료하지 않고 재시작 버튼을 누를 때까지 기다립니다.', '이미 받은 업데이트 파일을 재사용할 때도 자동 종료하지 않습니다.', 'AI 패널 접기·다시 열기와 왼쪽·오른쪽 이동을 수정했습니다.', '기존 계정 연결·문서·메모와 DOC 재열기 개선을 유지합니다.']
+notes=['다운로드가 끝나도 종료하지 않고 재시작 버튼을 누를 때까지 기다립니다.', '이미 받은 업데이트 파일을 재사용할 때도 자동 종료하지 않습니다.', 'AI 패널 접기·다시 열기와 왼쪽·오른쪽 이동을 수정했습니다.', '찾기 창을 닫은 뒤 바로 화살표 이동 및 키보드 편집이 가능합니다.', '기존 계정 연결·문서·메모와 DOC 재열기 개선을 유지합니다.']
 entry={'url':'https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.9/'+output.name,'size':output.stat().st_size,'sha256':sha(output)}
 feed={'product':'electimes-office','platform':'win32-x64','version':'1.0.9','build':109,'minBuild':103,'maxBuild':108,'notes':notes,'installer':entry,'fullInstaller':entry}
 (root/'electimes-latest.json').write_text(json.dumps(feed,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')

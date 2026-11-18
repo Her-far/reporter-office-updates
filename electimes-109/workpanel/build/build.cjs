@@ -61,6 +61,7 @@ for(const name of fs.readdirSync(out))if(/^uninstall\.exe$/i.test(name))fs.rmSyn
 fs.writeFileSync(path.join(out,'resources/app.asar'),asar.rewriteArchive(orig,rep));
 const modified=[];
 modified.push(require('./compact-autosave.cjs')(path.join(out,'resources/modules/hwp/renderer'),exact));
+modified.push(...require('./find-focus.cjs')(path.join(out,'resources/modules'),exact));
 // Keep the original HWP menu elements and handlers; add scroll controls around them.
 const studioRelative='resources/modules/hwp/renderer/studio/index.html',studio=path.join(out,'resources/modules/hwp/renderer/studio');
 const studioHtml=fs.readFileSync(path.join(out,studioRelative),'utf8');
