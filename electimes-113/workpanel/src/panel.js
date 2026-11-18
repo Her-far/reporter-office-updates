@@ -98,6 +98,31 @@ function webMailView(){const n=el('div','mail-shell'),bar=el('div','toolbar mail
  bar.append(button('간편 메일',()=>setting({mailDisplay:'reader'})),back,reload,expand,zoom,more);n.append(bar);if(!state.prefs.mailEnabled){n.append(el('p','empty','업무 연동 설정에서 메일 기능을 켜 주세요.'));return n;}if(state.mail.error)n.append(el('p','section error',errors[state.mail.error]||'메일 화면을 다시 여세요.'));const slot=el('div','mail-slot');slot.setAttribute('aria-label','NAVER WORKS 웹메일');n.append(slot);
  const footer=el('div','mail-footer'),toggle=button('다운로드 '+state.downloads.length+'개',()=>{dialogBase('첨부파일 다운로드');if(!state.downloads.length)detail.append(el('p','sub','다운로드한 첨부파일이 여기에 표시됩니다.'));for(const d of state.downloads.slice().reverse()){const row=el('div','download');row.append(el('span','filename',d.name),el('span','sub',d.status==='completed'?'완료':d.status==='downloading'?'받는 중':'중단'));if(d.status==='completed')row.append(button('열기',()=>{detail.close();action('download-open',d.id);}),button('폴더',()=>{detail.close();action('download-show',d.id);}));detail.append(row);}});footer.append(toggle,el('span','sub','NAVER WORKS'));n.append(footer);
  requestAnimationFrame(()=>{const report=()=>{if(!slot.isConnected||detail.open)return;const r=slot.getBoundingClientRect();api.mailBounds({x:r.x,y:r.y,width:r.width,height:r.height});};mailObserver=new ResizeObserver(report);mailObserver.observe(slot);report();});return n;}
+function googleConversation() {
+ const box=el('section','google-conversation'), tools=el('div','toolbar'), history=el('div','google-history');
+ const message=el('p','sub'), input=el('textarea'), send=button('보내기',submit,'primary');
+ const cmd=(name,text)=>action('gemini-chat',{name,text});
+ const install=button('공식 프로그램 설치',()=>cmd('install'));
+ const guide=button('설치 안내',()=>cmd('guide'));
+ const login=button('Google 계정으로 연결',()=>cmd('connect'),'primary');
+ const cancel=button('중지',()=>cmd('cancel'));
+ input.placeholder='Gemini에게 질문하세요';input.maxLength=80000;
+ input.setAttribute('aria-label','Gemini 질문');
+ let submitting=false;
+ async function submit(){const text=input.value;if(submitting||!text.trim()||!state.aiWeb.google?.ready||state.aiWeb.google.busy)return;submitting=true;try{if(await cmd('send',text)&&input.value===text)input.value='';}finally{submitting=false;}}
+ input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();void submit();}};
+ const compose=el('div','google-compose');compose.append(input,send);
+ tools.append(install,guide,login,cancel);box.append(tools,message,history,compose);
+ box.update=({installed,ready,busy,notice,messages})=>{
+   install.hidden=guide.hidden=installed;login.hidden=!installed||ready;install.disabled=login.disabled=busy;cancel.hidden=!busy;
+   message.textContent=notice||(!installed?'Google Antigravity를 설치한 뒤 개인 Google 계정으로 연결하세요.':'');message.hidden=!message.textContent;
+   compose.hidden=!ready;send.disabled=busy;
+   const stick=history.scrollHeight-history.scrollTop-history.clientHeight<80;
+   while(history.children.length>messages.length)history.lastChild.remove();
+   messages.forEach((m,i)=>{let row=history.children[i];if(!row){row=el('article');row.append(el('strong'),el('div'));history.append(row);}row.firstChild.textContent=m.role;if(row.lastChild.textContent!==m.text)row.lastChild.textContent=m.text;});
+   if(stick)history.scrollTop=history.scrollHeight;
+ };box.update(state.aiWeb.google);return box;
+}
 let aiKey='';
 function aiWebView(){const w=state.aiWeb,n=el('div','mail-shell ai-shell'),bar=el('div','toolbar mail-toolbar ai-toolbar');
  const tabs=el('div','ai-services');tabs.setAttribute('role','tablist');tabs.setAttribute('aria-label','AI 서비스');
@@ -110,24 +135,27 @@ function aiWebView(){const w=state.aiWeb,n=el('div','mail-shell ai-shell'),bar=e
  const extra=el('div','mail-extra ai-extra');
  const zoom=el('select','mail-zoom');zoom.setAttribute('aria-label','웹 AI 화면 배율');for(const value of [0.65,0.75,0.85,1,1.1,1.25]){const o=el('option','',Math.round(value*100)+'%');o.value=value;zoom.append(o);}zoom.value=state.prefs.aiWebZoom||1;zoom.onchange=()=>setting({aiWebZoom:Number(zoom.value)});
  const link=el('form','ai-link'),input=el('input');input.type='url';input.placeholder='이메일로 받은 로그인 링크 붙여넣기';input.setAttribute('aria-label','로그인 링크');link.append(input,button('이동',()=>link.requestSubmit()));link.onsubmit=e=>{e.preventDefault();if(input.value.trim())void action('ai-link',input.value.trim());};
- if(w.service!=='chatgpt'){
+ if(w.service==='gemini')extra.append(button(w.google?'Gemini 웹 화면으로':'Google 계정 대화로 전환',()=>setting({geminiAccountChat:!w.google}),'primary'));
+ if(w.service!=='chatgpt'&&!w.google){
  extra.append(button('로그인 창 열기',()=>action('ai-login'),'primary ai-login-open'),button('처음 화면',()=>action('ai-home')),button('Edge 창으로 열기',()=>action('ai-browser')),button('기본 브라우저에서 열기',()=>action('ai-external')),link,zoom,button(label+' 로그아웃',()=>action('ai-reset'),'danger'));
  extra.append(el('p','sub','로그인은 별도 창에서 하고, 끝나면 창이 닫히며 패널에 반영됩니다. 그래도 안 되면 Edge 창으로 여세요(평소 브라우저의 로그인 사용).'));
  }
  more.append(extra);
  if(w.service==='chatgpt') bar.append(tabs,expand);
+ else if(w.google)bar.append(tabs,expand,more);
  else bar.append(tabs,back,reload,expand,more);
  n.append(bar);
  if(!w.enabled){n.append(el('p','empty','업무 연동 설정에서 웹 AI를 켜 주세요.'));return n;}
+ if(w.google){n.append(googleConversation());return n;}
  if(w.service!=='chatgpt'&&!state.prefs.aiWebNoticeSeen){const box=el('div','ai-notice');box.append(el('p','','처음 한 번 각 서비스에 로그인하면 이 PC에서 유지됩니다. 엠바고·미공개 원고, 취재원과 개인정보는 입력하지 마세요. 무료 계정의 대화는 서비스 회사의 AI 학습에 쓰일 수 있습니다.'),button('확인',()=>setting({aiWebNoticeSeen:true}),'primary'));n.append(box);}
  if(w.error){const box=el('div','section error');box.append(el('span','',(w.service==='chatgpt'?w.error:errors[w.error])||'AI 화면을 다시 여세요.'),button('다시 시도',()=>action(w.service==='chatgpt'?'ai-login':'ai-reload')));n.append(box);}
  const slot=el('div','mail-slot');slot.setAttribute('aria-label',label+' 웹 화면');
  n.append(slot);
  if(w.service!=='chatgpt')n.append(el('div','mail-footer ai-footer','답변을 복사해 문서에 Ctrl+V로 붙여넣으세요 · '+label+' 공식 웹'));
  requestAnimationFrame(()=>{const report=()=>{if(!slot.isConnected||detail.open)return;const r=slot.getBoundingClientRect();api.mailBounds({x:r.x,y:r.y,width:r.width,height:r.height});};mailObserver=new ResizeObserver(report);mailObserver.observe(slot);report();});return n;}
-function renderAiWeb(){const w=state.aiWeb,key=JSON.stringify([w.service,w.enabled,w.error,state.prefs.aiWebNoticeSeen,state.prefs.aiWebZoom,state.expanded]);
+function renderAiWeb(){const w=state.aiWeb,key=JSON.stringify([w.service,!!w.google,w.enabled,w.error,state.prefs.aiWebNoticeSeen,state.prefs.aiWebZoom,state.expanded]);
  // Page loads emit often; keep the toolbar (and an open menu or typed link) unless something visible changed.
- if(key===aiKey&&root.querySelector('.ai-shell')){const back=root.querySelector('.ai-back');if(back)back.disabled=!w.canGoBack;return;}
+ if(key===aiKey&&root.querySelector('.ai-shell')){if(w.google)root.querySelector('.google-conversation')?.update(w.google);const back=root.querySelector('.ai-back');if(back)back.disabled=!w.canGoBack;return;}
  aiKey=key;mailObserver?.disconnect();root.replaceChildren(aiWebView());}
 function render(){if(!state)return;if(state.menu==='aiweb'){document.documentElement.dataset.theme=state.dark?'dark':'light';renderAiWeb();return;}aiKey='';mailObserver?.disconnect();document.documentElement.dataset.theme=state.dark?'dark':'light';const scroll=window.scrollY;
  if(state.menu==='settings')root.replaceChildren(settings());else if(state.menu==='mail'){const n=mailView();if(root.firstChild!==n)root.replaceChildren(n);}else if(state.menu==='notes'){if(!document.querySelector('.notes-view'))root.replaceChildren(notesView());}else if(!state.calendar.connected)root.replaceChildren(connection());else{const n=state.menu==='schedule'?scheduleView():calendarView();const status=el('div','sync-status',state.calendar.lastSync?'동기화 '+format(state.calendar.lastSync,{hour:'2-digit',minute:'2-digit',second:'2-digit'}):'일정을 불러오는 중…');n.append(status);if(state.calendar.error)n.append(el('p','section error',errors[state.calendar.error]||'일정을 갱신하지 못했습니다. 이전에 받은 일정을 표시합니다.'));root.replaceChildren(n);}window.scrollTo(0,scroll);}

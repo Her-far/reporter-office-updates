@@ -35,7 +35,13 @@ function register(deps){
   let saving=Promise.resolve();
   function persist(){const json=JSON.stringify(prefs,null,2);saving=saving.catch(()=>{}).then(async()=>{await fsp.mkdir(dir(),{recursive:true});await fsp.writeFile(config()+'.tmp',json,{mode:0o600});await fsp.rename(config()+'.tmp',config());});return saving;}
   function hostState(){return {prefs,menu:panelMode,expanded,version:'1.0.13'};}
-  function aiState(){const id=prefs.aiWebService,st=aiStatus.get(id)||{},v=aiViews.get(id);return {enabled:prefs.aiWebEnabled,service:id,services:aiWeb.SERVICE_IDS.map(k=>({id:k,label:aiWeb.SERVICES[k].label})),error:st.error||'',ready:!!st.ready,canGoBack:!!(v&&!v.webContents.isDestroyed()&&v.webContents.navigationHistory.canGoBack())};}
+  let gemini;
+  function googleChat() {
+    gemini ??= require('./gemini-acp.cjs').create({root:path.join(app.getPath('userData'),'subscription-panel'),fetch:net.fetch.bind(net),changed:emit});
+    return gemini;
+  }
+  function useGoogleChat() {return prefs.aiWebService==='gemini' && prefs.geminiAccountChat;}
+  function aiState(){const id=prefs.aiWebService,st=aiStatus.get(id)||{},v=aiViews.get(id);return {google:panelMode==='aiweb'&&useGoogleChat()?googleChat().state():null,enabled:prefs.aiWebEnabled,service:id,services:aiWeb.SERVICE_IDS.map(k=>({id:k,label:aiWeb.SERVICES[k].label})),error:st.error||'',ready:!!st.ready,canGoBack:!!(v&&!v.webContents.isDestroyed()&&v.webContents.navigationHistory.canGoBack())};}
   function downloadRoot(){return prefs.downloadFolder||app.getPath('downloads');}
   function state(){return {...hostState(),downloadFolder:downloadRoot(),notes:notes.snapshot(),notesError,notesWarning:notes.warning,calendar:calendar.status(),calendars:calendar.calendars,events:calendar.events,range,reader:reader.status(),mail:{enabled:prefs.mailEnabled,error:mailError,ready:mailReady},aiWeb:aiState(),downloads:[...downloads.values()].slice(-50).map(({id,name,status,bytes})=>({id,name,status,bytes})),dark:nativeTheme.shouldUseDarkColors};}
   function emit(){revision++;if(panel&&!panel.webContents.isDestroyed())panel.webContents.send('wp:state',state());}
@@ -70,7 +76,7 @@ function register(deps){
     else {mail?.setVisible(false);mail?.webContents.setAudioMuted(true);}
     // mailRect is the panel's remote-page slot; the web AI page uses the same slot.
     let shown=null, showingChat=false;
-    if(panelMode==='aiweb'&&prefs.aiWebEnabled&&mailRect&&!mailModal){const z=panel.webContents.getZoomFactor();const m={x:Math.round(r.x+mailRect.x*z),y:Math.round(r.y+mailRect.y*z),width:Math.min(Math.round(mailRect.width*z),r.width),height:Math.min(Math.round(mailRect.height*z),r.height-Math.round(mailRect.y*z))};if(m.width>50&&m.height>50 && prefs.aiWebService==='chatgpt'){showingChat=true;showChat(m);}else if(m.width>50&&m.height>50){const v=ensureAi(prefs.aiWebService);win.contentView.addChildView(v);v.setBounds(m);v.setVisible(true);v.webContents.setAudioMuted(false);shown=v;}}
+    if(panelMode==='aiweb'&&prefs.aiWebEnabled&&!useGoogleChat()&&mailRect&&!mailModal){const z=panel.webContents.getZoomFactor();const m={x:Math.round(r.x+mailRect.x*z),y:Math.round(r.y+mailRect.y*z),width:Math.min(Math.round(mailRect.width*z),r.width),height:Math.min(Math.round(mailRect.height*z),r.height-Math.round(mailRect.y*z))};if(m.width>50&&m.height>50 && prefs.aiWebService==='chatgpt'){showingChat=true;showChat(m);}else if(m.width>50&&m.height>50){const v=ensureAi(prefs.aiWebService);win.contentView.addChildView(v);v.setBounds(m);v.setVisible(true);v.webContents.setAudioMuted(false);shown=v;}}
     if(!showingChat) hideChat();
     hideAi(shown);
   }
@@ -231,6 +237,12 @@ function register(deps){
       else if(a==='download-folder'){const r=await dialog.showOpenDialog(deps.window(),{title:'메일 첨부파일 기본 저장 위치',defaultPath:downloadRoot(),properties:['openDirectory','createDirectory']});if(!r.canceled&&r.filePaths[0]){prefs.downloadFolder=r.filePaths[0];await persist();}}
       else if(a==='download-folder-open'){try{await fsp.mkdir(downloadRoot(),{recursive:true});const error=await shell.openPath(downloadRoot());if(error)throw Error(error);}catch{throw Error('download-folder');}}
       else if(a==='reset-mail'){const r=await dialog.showMessageBox(deps.window(),{type:'question',buttons:['취소','로그인 초기화'],defaultId:0,cancelId:0,message:'내장 웹메일의 네이버웍스 로그인을 초기화할까요?',detail:'작성 중인 메일은 먼저 저장하세요. 외부 브라우저의 로그인과 간편 메일 연결은 바뀌지 않습니다.'});if(r.response===1){for(const w of popups)w.close();if(mail){deps.window().contentView.removeChildView(mail);mail.webContents.close();mail=null;}if(mailSession){await mailSession.clearStorageData();await mailSession.clearCache();await mailSession.closeAllConnections();}mailReady=false;mailError='';layout();}}
+      else if(a==='gemini-chat') {
+        if(!prefs.aiWebEnabled||!useGoogleChat()||panelMode!=='aiweb')throw Error('ai-disabled');
+        if(!['install','connect','send','cancel','guide'].includes(x?.name))throw Error('unknown-action');
+        if(x.name==='guide')await shell.openExternal('https://antigravity.google/docs/cli/install');
+        else void googleChat().run(x.name,x.text);
+      }
       else if(a==='ai-service'){if(!aiWeb.SERVICES[x])throw Error('unknown-action');prefs=settingsOf({aiWebService:x},prefs);await persist();layout();}
       else if(a==='ai-home'){if(!prefs.aiWebEnabled)throw Error('ai-disabled');const v=aiViews.get(prefs.aiWebService);if(v&&!v.webContents.isDestroyed())await v.webContents.loadURL(aiWeb.SERVICES[prefs.aiWebService].home).catch(()=>{});else layout();}
       else if(a==='ai-back'){const v=aiViews.get(prefs.aiWebService);if(v?.webContents.navigationHistory.canGoBack())v.webContents.navigationHistory.goBack();}
@@ -265,7 +277,7 @@ function register(deps){
     }catch(err){return {ok:false,error:String(err.message).slice(0,100)};}});
   nativeTheme.on('updated',emit);
   function attach(){const m=deps.manager();if(m&&!m.__workPanelLayout){m.__workPanelLayout=true;const original=m.layout.bind(m);m.layout=(...args)=>{const result=original(...args);layout();const win=deps.window();for(const wc of [win?.webContents,...(win?.contentView.children||[]).map(v=>v.webContents)].filter(Boolean))if(!wc.isDestroyed()&&deps.isHost(wc))wc.send('wp:refresh');return result;};}const w=deps.window();if(w&&!w.__workPanelAttached){w.__workPanelAttached=true;w.on('minimize',hide);w.on('restore',layout);w.on('resize',layout);w.on('closed',()=>{reader.close();for(const popup of popups)popup.close();for(const v of [panel,mail,...aiViews.values()]){const wc=v?.webContents;if(wc&&!wc.isDestroyed())wc.close();}panel=mail=null;aiViews.clear();});}}
-  app.on('before-quit',event=>{if(!notesQuitReady&&notes.flushRequired&&event?.preventDefault){event.preventDefault();notes.flush().then(()=>{notesQuitReady=true;setImmediate(()=>app.quit());}).catch(()=>{void dialog.showMessageBox(deps.window(),{type:'error',message:'메모를 저장하지 못해 종료를 중단했습니다.',detail:'메모 내용을 복사해 보관하고 저장 공간을 확인해 주세요.'});});return;}closing=true;subscription?.close();clearInterval(timer);calendar.close();reader.close();for(const w of popups)w.close();for(const v of [panel,mail,...aiViews.values()]){const wc=v?.webContents;if(wc&&!wc.isDestroyed())wc.close();}});
+  app.on('before-quit',event=>{if(!notesQuitReady&&notes.flushRequired&&event?.preventDefault){event.preventDefault();notes.flush().then(()=>{notesQuitReady=true;setImmediate(()=>app.quit());}).catch(()=>{void dialog.showMessageBox(deps.window(),{type:'error',message:'메모를 저장하지 못해 종료를 중단했습니다.',detail:'메모 내용을 복사해 보관하고 저장 공간을 확인해 주세요.'});});return;}closing=true;gemini?.close();subscription?.close();clearInterval(timer);calendar.close();reader.close();for(const w of popups)w.close();for(const v of [panel,mail,...aiViews.values()]){const wc=v?.webContents;if(wc&&!wc.isDestroyed())wc.close();}});
   installed={attach,layout};return installed;
 }
 module.exports={register,attach:()=>installed?.attach(),isMailContents:wc=>mailContents.has(wc)};

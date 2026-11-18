@@ -21,3 +21,11 @@
 .ai-notice{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--accent-soft);font-size:12px;line-height:1.5;flex-shrink:0}.ai-notice p{margin:0;flex:1}.ai-notice .primary{width:auto;margin:0;flex:none;padding:4px 10px}
 .ai-shell>.error{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}.ai-footer{justify-content:flex-start;color:var(--sub)}
 .ai-extra .ai-login-open{width:auto;margin:0}
+
+.google-conversation{display:flex;flex:1;min-height:0;flex-direction:column;gap:8px;padding:10px}
+.google-conversation [hidden]{display:none!important}
+.google-history{flex:1;overflow:auto;min-height:0}
+.google-history article{padding:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.google-compose{display:flex;gap:6px;align-items:end}
+.google-compose textarea{min-width:0;flex:1;padding:8px;resize:vertical}
+.ai-toolbar:has(+.google-conversation):has(.mail-more[open]){min-height:80px}

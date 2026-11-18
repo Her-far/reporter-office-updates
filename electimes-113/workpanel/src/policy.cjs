@@ -4,7 +4,7 @@ const MENUS = ['ai', 'aiweb', 'mail', 'calendar', 'notes'];
 const AI_WEB_SERVICES = ['chatgpt', 'claude', 'gemini'];
 const READ_SCOPES = ['https://www.googleapis.com/auth/calendar.calendarlist.readonly', 'https://www.googleapis.com/auth/calendar.events.readonly'];
 const WRITE_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
-const DEFAULTS = Object.freeze({menu:'ai', defaultMenu:'ai', width:400, panelWidthVersion:1, mailDisplay:'reader', mailZoom:1, restoreMenu:true, showOnStart:true, mailEnabled:true, mailUrl:'https://mail.worksmobile.com/', downloadFolder:'', offerOpen:true, autoSync:true, syncMinutes:5, calendarIds:['primary'], calendarView:'month', scheduleView:'week', aiWebEnabled:true, aiWebService:'chatgpt', aiWebZoom:1, aiWebNoticeSeen:false});
+const DEFAULTS = Object.freeze({menu:'ai', defaultMenu:'ai', width:400, panelWidthVersion:1, mailDisplay:'reader', mailZoom:1, restoreMenu:true, showOnStart:true, mailEnabled:true, mailUrl:'https://mail.worksmobile.com/', downloadFolder:'', offerOpen:true, autoSync:true, syncMinutes:5, calendarIds:['primary'], calendarView:'month', scheduleView:'week', geminiAccountChat:false, aiWebEnabled:true, aiWebService:'chatgpt', aiWebZoom:1, aiWebNoticeSeen:false});
 function httpsUrl(value) {
   try { const u = new URL(value); return u.protocol === 'https:' && !u.username && !u.password && !u.port && value.length < 4096 ? u : null; } catch { return null; }
 }
@@ -28,7 +28,7 @@ function fileKind(filename) {
 }
 function settingsOf(raw, prev=DEFAULTS) {
   const p=raw && typeof raw === 'object' ? {...raw} : {};for(const k of ['menu','defaultMenu'])if(p[k]==='schedule')p[k]='notes'; const next={...prev};
-  for (const k of ['restoreMenu','showOnStart','mailEnabled','offerOpen','autoSync','aiWebEnabled','aiWebNoticeSeen']) if (typeof p[k]==='boolean') next[k]=p[k];
+  for (const k of ['restoreMenu','showOnStart','mailEnabled','offerOpen','autoSync','aiWebEnabled','aiWebNoticeSeen','geminiAccountChat']) if (typeof p[k]==='boolean') next[k]=p[k];
   for (const k of ['menu','defaultMenu']) if (MENUS.includes(p[k])) next[k]=p[k];
   if (['reader','web'].includes(p.mailDisplay)) next.mailDisplay=p.mailDisplay;
   if (AI_WEB_SERVICES.includes(p.aiWebService)) next.aiWebService=p.aiWebService;

@@ -68,6 +68,11 @@ for (const name of ['plan-auth.cjs','plan-chat.cjs','plan-view.cjs','plan-preloa
   if (/\.c?js$/.test(name)) new vm.Script(bytes.toString());
   replacements.set(wp + name, bytes);
 }
+for (const name of ['gemini-acp.cjs','official-cli.cjs']) {
+  const bytes=fs.readFileSync(path.join(__dirname,'gemini',name));
+  new vm.Script(bytes.toString());
+  replacements.set(wp+name,bytes);
+}
 pkg.version = TO.version;
 pkg.electimesModificationNotice = 'Web AI (official ChatGPT, Claude and Gemini pages in isolated sessions) in the work panel; the bundled command line starts Electimes Office.exe and uses the Electimes Office profile. All 1.0.12 fixes and original notices retained.';
 replacements.set('package.json', Buffer.from(JSON.stringify(pkg, null, 2)));
