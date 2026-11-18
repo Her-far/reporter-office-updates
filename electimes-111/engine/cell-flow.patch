@@ -1,0 +1,184 @@
+--- a/src/document_core/commands/clipboard.rs
++++ b/src/document_core/commands/clipboard.rs
+@@ -891,6 +891,7 @@
+             )));
+         }
+ 
++        super::text_editing::remember_cell_vpos_resets(cell_paras);
+         let clip_count = clip_paras.len();
+         if clip_count == 1 && clip_paras[0].controls.is_empty() {
+             let clip_text = clip_paras[0].text.clone();
+@@ -916,7 +917,9 @@
+ 
+         let mut insert_idx = cell_para_idx + 1;
+         for clip_para in clip_paras.iter().skip(1) {
+-            cell_paras.insert(insert_idx, clip_para.clone());
++            let mut inserted = clip_para.clone();
++            inserted.cell_vpos_reset = Some(false);
++            cell_paras.insert(insert_idx, inserted);
+             insert_idx += 1;
+         }
+ 
+@@ -991,6 +994,14 @@
+         for i in cell_para_idx..=last_para_idx {
+             self.reflow_cell_paragraph(section_idx, parent_para_idx, control_idx, cell_idx, i);
+         }
++        self.recalculate_cell_paragraph_vpos_native(
++            section_idx,
++            parent_para_idx,
++            control_idx,
++            cell_idx,
++            cell_para_idx,
++            None,
++        );
+         self.mark_cell_control_dirty(section_idx, parent_para_idx, control_idx);
+         self.document.sections[section_idx].raw_stream = None;
+         self.mark_section_dirty(section_idx);
+@@ -1045,6 +1056,13 @@
+             self.reflow_cell_paragraph_by_path(section_idx, parent_para_idx, path, i);
+         }
+ 
++        self.recalculate_cell_paragraph_vpos_by_path(
++            section_idx,
++            parent_para_idx,
++            path,
++            cell_para_idx,
++            None,
++        );
+         let outer_ctrl = path[0].0;
+         self.mark_cell_control_dirty(section_idx, parent_para_idx, outer_ctrl);
+         self.document.sections[section_idx].raw_stream = None;
+--- a/src/document_core/commands/html_import.rs
++++ b/src/document_core/commands/html_import.rs
+@@ -353,6 +353,7 @@
+             )));
+         }
+ 
++        super::text_editing::remember_cell_vpos_resets(cell_paras);
+         let clip_count = parsed_paras.len();
+         if clip_count == 1 && parsed_paras[0].controls.is_empty() {
+             let clip_text = parsed_paras[0].text.clone();
+@@ -378,7 +379,9 @@
+ 
+         let mut insert_idx = cell_para_idx + 1;
+         for parsed_para in parsed_paras.iter().skip(1) {
+-            cell_paras.insert(insert_idx, parsed_para.clone());
++            let mut inserted = parsed_para.clone();
++            inserted.cell_vpos_reset = Some(false);
++            cell_paras.insert(insert_idx, inserted);
+             insert_idx += 1;
+         }
+ 
+@@ -435,6 +438,14 @@
+         for i in cell_para_idx..=last_para_idx {
+             self.reflow_cell_paragraph(section_idx, parent_para_idx, control_idx, cell_idx, i);
+         }
++        self.recalculate_cell_paragraph_vpos_native(
++            section_idx,
++            parent_para_idx,
++            control_idx,
++            cell_idx,
++            cell_para_idx,
++            None,
++        );
+         self.mark_cell_control_dirty(section_idx, parent_para_idx, control_idx);
+         self.mark_section_dirty(section_idx);
+         self.paginate_if_needed();
+@@ -479,6 +490,16 @@
+             )?
+         };
+ 
++        for i in cell_para_idx..=last_para_idx {
++            self.reflow_cell_paragraph_by_path(section_idx, parent_para_idx, path, i);
++        }
++        self.recalculate_cell_paragraph_vpos_by_path(
++            section_idx,
++            parent_para_idx,
++            path,
++            cell_para_idx,
++            None,
++        );
+         let outer_ctrl = path[0].0;
+         self.mark_cell_control_dirty(section_idx, parent_para_idx, outer_ctrl);
+         self.document.sections[section_idx].raw_stream = None;
+--- a/src/document_core/commands/text_editing.rs
++++ b/src/document_core/commands/text_editing.rs
+@@ -34,6 +34,15 @@
+                 && current.tag & LineSeg::TAG_IMPLEMENTATION_PROPERTY == 0
+         }
+         _ => false,
++    }
++}
++
++/// Capture stored RowBreak frame boundaries before text or paragraph insertion changes
++/// the neighboring line origins. Pasted paragraphs belong to the destination frame.
++pub(super) fn remember_cell_vpos_resets(paragraphs: &mut [Paragraph]) {
++    for idx in 1..paragraphs.len() {
++        let reset = cell_vpos_resets(&paragraphs[idx - 1], &paragraphs[idx]);
++        paragraphs[idx].cell_vpos_reset = Some(reset);
+     }
+ }
+ 
+@@ -3388,6 +3397,18 @@
+ 
+         if let Some((ppi, ci, cei)) = cell_ctx {
+             // ─── 셀 내 deleteRange ───
++            // Use the flat accessor so shape textboxes and caption sentinels retain
++            // the same supported contexts as deleteRangeInCell itself.
++            let mut idx = 1;
++            while let Some(reset) = self
++                .get_cell_paragraph_ref(section_idx, ppi, ci, cei, idx - 1)
++                .zip(self.get_cell_paragraph_ref(section_idx, ppi, ci, cei, idx))
++                .map(|(previous, current)| cell_vpos_resets(previous, current))
++            {
++                self.get_cell_paragraph_mut(section_idx, ppi, ci, cei, idx)?
++                    .cell_vpos_reset = Some(reset);
++                idx += 1;
++            }
+             if start_para == end_para {
+                 // 같은 문단 내 삭제
+                 let count = end_offset - start_offset;
+@@ -3440,6 +3461,15 @@
+                 self.reflow_cell_paragraph(section_idx, ppi, ci, cei, start_para);
+             }
+ 
++            // Reflow changes the paragraph height; move the rest of this cell frame too.
++            self.recalculate_cell_paragraph_vpos_native(
++                section_idx,
++                ppi,
++                ci,
++                cei,
++                start_para,
++                None,
++            );
+             // 부모 컨트롤 dirty 마킹 + 재페이지네이션
+             self.mark_cell_control_dirty(section_idx, ppi, ci);
+             self.mark_section_dirty(section_idx);
+@@ -6056,6 +6086,7 @@
+     ) -> Result<String, HwpError> {
+         {
+             let paras = self.get_cell_paragraphs_mut_by_path(section_idx, parent_para_idx, path)?;
++            remember_cell_vpos_resets(paras);
+             if start_para == end_para {
+                 let count = end_offset.saturating_sub(start_offset);
+                 if count > 0 {
+@@ -6101,11 +6132,15 @@
+             }
+         }
+ 
+-        // [#2755] flat `delete_range_native` 셀 분기와 동일하게 병합 생존 문단(start_para)을
+-        // 셀 폭 기준으로 재래핑한다. by_path 리플로우는 최내곽 셀 폭을 해석하므로 깊이 1·2+ 를
+-        // 모두 처리하고, by_path 본문이 표/글상자/그림 캡션의 다중 문단까지 처리하는 것과도
+-        // 정합한다(flat delete_range 는 vpos 재계산을 하지 않으므로 여기서도 리플로우만 한다).
++        // Reflow using the innermost cell width, then reconnect the following paragraphs.
+         self.reflow_cell_paragraph_by_path(section_idx, parent_para_idx, path, start_para);
++        self.recalculate_cell_paragraph_vpos_by_path(
++            section_idx,
++            parent_para_idx,
++            path,
++            start_para,
++            None,
++        );
+ 
+         // dirty/이벤트는 delete_text_in_cell_by_path 와 동형(최외곽 컨트롤 기준).
+         let outer_ctrl = path[0].0;

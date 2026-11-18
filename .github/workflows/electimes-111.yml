@@ -1,0 +1,140 @@
+name: Electimes Office 1.0.11 HWP cell paste layout
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/electimes-111.yml', 'electimes-111/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: electimes-production-release
+  cancel-in-progress: true
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: core
+        with:
+          path: electimes-111/engine-built
+          key: hwp-111-engine-rust1931-bindgen02127-${{ hashFiles('electimes-111/engine/*.py', 'electimes-111/engine/*.patch', 'electimes-109/engine/apply-table-zones.py') }}
+      - uses: actions/cache@v4
+        if: steps.core.outputs.cache-hit != 'true'
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            engine-work/rhwp/target
+          key: hwp-087-vendor11-cell-flow-${{ hashFiles('electimes-111/engine/*.py', 'electimes-111/engine/*.patch') }}
+          restore-keys: hwp-087-vendor11-
+      - name: Install pinned Rust and WASM binding tools
+        if: steps.core.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          rustup toolchain install 1.93.1 --profile minimal --target wasm32-unknown-unknown
+          curl --fail --location --retry 3 -o wasm-bindgen.tar.gz https://github.com/wasm-bindgen/wasm-bindgen/releases/download/0.2.127/wasm-bindgen-0.2.127-x86_64-unknown-linux-musl.tar.gz
+          echo '61d4a7dc85acfa0d2354ccc0b8361928c7e52a746d17f28ebaa795ed3dc1614a  wasm-bindgen.tar.gz' | sha256sum --check
+          tar -xf wasm-bindgen.tar.gz
+          echo "$PWD/wasm-bindgen-0.2.127-x86_64-unknown-linux-musl" >> "$GITHUB_PATH"
+      - name: Build pinned HWP engine with preserved vendor patches
+        if: steps.core.outputs.cache-hit != 'true'
+        run: python electimes-111/engine/build-core.py engine-work electimes-111/engine-built
+      - name: Verify cell paste, deletion, undo and document roundtrips
+        run: |
+          node electimes-111/engine/cell-flow-regression.mjs electimes-111/engine-built
+          cp electimes-111/engine/cell-flow-results.json electimes-111/engine-built/cell-flow-results.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electimes-111-hwp-engine
+          path: electimes-111/engine-built/
+  windows:
+    needs: engine
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: electimes-111-hwp-engine
+          path: electimes-111/engine-built
+      - name: Install packaging and native test tools
+        working-directory: electimes-111
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          npm install --no-save --ignore-scripts playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Test tools installation failed' }
+      - name: Apply audited overlay to the exact published 1.0.10
+        working-directory: electimes-111
+        shell: pwsh
+        run: |
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          curl.exe --fail --location --retry 3 -o base.exe https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.10/ElectimesOffice-Setup-1.0.10-x64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Verified base download failed' }
+          Copy-Item engine-built/cell-flow-results.json engine/cell-flow-results.json
+          $env:ELECTIMES_HWP_CORE = Join-Path $PWD 'engine-built'
+          python rebuild.py --stage-only
+          if ($LASTEXITCODE -ne 0) { throw 'Overlay or resource preservation failed' }
+          node ../electimes-109/engine/verify-core.mjs base-installer engine-built
+          if ($LASTEXITCODE -ne 0) { throw 'Existing HWP engine compatibility failed' }
+      - name: Verify native HWP paste, Enter, Backspace and undo-redo
+        timeout-minutes: 6
+        working-directory: electimes-111
+        shell: pwsh
+        run: |
+          node cell-flow-native.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'HWP native editing regression failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-111-native-validation
+          path: |
+            electimes-111/*-windows.json
+            electimes-111/*-windows.png
+            electimes-111/engine/cell-flow-results.json
+            electimes-111/startup-quit-*.txt
+            electimes-111/stage/BUILD-VERIFICATION.json
+      - name: Package and verify fresh install and 1.0.10 upgrade
+        working-directory: electimes-111
+        shell: pwsh
+        run: |
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          python rebuild.py
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging or payload comparison failed' }
+          ./smoke.ps1
+      - name: Publish verified installer and company update channel
+        working-directory: electimes-111
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create electimes-v1.0.11 ElectimesOffice-Setup-1.0.11-x64.exe ElectimesOffice-SHA256SUMS-1.0.11.txt cell-flow-windows.json engine/cell-flow-results.json windows-smoke.json --title '전기신문 Office 1.0.11 — HWP 붙여넣기 문단 겹침 수정' --notes-file release-notes.txt --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          $feed = Get-Content -Raw electimes-latest.json
+          Set-Location ..
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --ff-only origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Refresh channel head failed' }
+          $current = Get-Content -Raw electimes-latest.json | ConvertFrom-Json
+          if ($current.build -ge 111) { throw 'A newer or same release already owns the channel' }
+          [IO.File]::WriteAllText((Join-Path $PWD 'electimes-latest.json'), $feed, [Text.UTF8Encoding]::new($false))
+          git add electimes-latest.json
+          git commit -m 'release: publish Electimes Office 1.0.11 HWP cell paste layout'
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Update channel publication failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-111-validation
+          path: |
+            electimes-111/*-windows.json
+            electimes-111/*-windows.png
+            electimes-111/engine/cell-flow-results.json
+            electimes-111/windows-smoke.json
+            electimes-111/startup-*.txt
