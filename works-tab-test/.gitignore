@@ -1,0 +1,10 @@
+node_modules/
+package-lock.json
+base.exe
+base-installer/
+stage/
+ElectimesOffice-Works-Test-1/
+*.zip
+*-windows.json
+*-windows.png
+SHA256SUMS.txt
