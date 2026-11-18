@@ -1,12 +1,8 @@
 {
-  "name": "electimes-office-subscription-panel-test",
+  "name": "electimes-office-browser-test",
   "private": true,
-  "version": "1.0.12-aiweb.2",
-  "dependencies": {
-    "@xterm/xterm": "6.0.0",
-    "@xterm/addon-fit": "0.11.0",
-    "jose": "6.2.17",
-    "node-pty": "1.1.0"
-  },
-  "devDependencies": {"playwright": "1.62.1"}
+  "version": "1.0.12-aiweb.3",
+  "devDependencies": {
+    "playwright": "1.62.1"
+  }
 }

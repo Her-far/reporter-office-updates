@@ -17,19 +17,17 @@ main=exact(main,"if (require('./work-panel/main.cjs').isMailContents(contents)) 
 js('out/main/index.js',main);
 js('out/main/ai-web-test-bootstrap.cjs',fs.readFileSync(path.join(root,'test-bootstrap.cjs'),'utf8'));
 js('out/main/reporter-updater.cjs',fs.readFileSync(path.join(root,'disabled-updater.cjs'),'utf8'));
-for(const name of ['ai-web.cjs','ai-web-policy.cjs','plan-auth.cjs','plan-chat.cjs','plan-preload.cjs','plan-panel.js','official-cli.cjs'])js('out/main/work-panel/'+name,fs.readFileSync(path.join(root,name),'utf8'));
-for(const name of ['plan-panel.html','plan-panel.css'])replace.set('out/main/work-panel/'+name,fs.readFileSync(path.join(root,name)));
-for(const [dest,src]of [['xterm.js','@xterm/xterm/lib/xterm.js'],['xterm.css','@xterm/xterm/css/xterm.css'],['addon-fit.js','@xterm/addon-fit/lib/addon-fit.js']])replace.set('out/main/work-panel/'+dest,fs.readFileSync(path.join(root,'node_modules',src)));
+for(const name of ['ai-web.cjs','ai-web-policy.cjs','browser-companion.cjs'])js('out/main/work-panel/'+name,fs.readFileSync(path.join(root,name),'utf8'));
 let policy=lf(a.content(archive,'out/main/work-panel/policy.cjs').toString());
 policy=exact(policy,"menu:'ai', defaultMenu:'ai',","menu:'ai', defaultMenu:'ai', aiMode:'web', aiProvider:'chatgpt',");
 policy=exact(policy,'  return next;',"  const ai=require('./ai-web-policy.cjs').preferences(p,{mode:prev.aiMode||'web',provider:prev.aiProvider||'chatgpt'});next.aiMode=ai.mode;next.aiProvider=ai.provider;\n  return next;");
 js('out/main/work-panel/policy.cjs',policy);
 let panel=lf(a.content(archive,'out/main/work-panel/main.cjs').toString());
-panel=exact(panel,"  const reader=new (require('./mail-reader.cjs').MailReader)({vault});",`  const aiWeb=require('./ai-web.cjs').create({window:deps.window,vault,owner:()=>owner,changed:()=>hosts(),expanded:()=>expanded,restore:()=>setExpanded(false),relayout:()=>layout(),isDocument:wc=>!!deps.manager()?.tabIdForWebContents(wc?.id)});
+panel=exact(panel,"  const reader=new (require('./mail-reader.cjs').MailReader)({vault});",`  const aiWeb=require('./ai-web.cjs').create({window:deps.window,vault,owner:()=>owner,changed:()=>hosts(),expanded:()=>expanded,restore:()=>setExpanded(false),relayout:()=>layout(),isDocument:wc=>!!deps.manager()?.tabIdForWebContents(wc?.id),prepareBrowser:async()=>{if(prefs.width<600){prefs.width=600;await persist();hosts();layout();}if(rect&&rect.width<500)setExpanded(true);}});
   const reader=new (require('./mail-reader.cjs').MailReader)({vault});`);
 panel=exact(panel,"await require('./migrate.cjs').importTestPanel(app.getPath('appData'),app.getPath('userData')).catch(()=>{});",'/* Independent profile: no production/test profile migration. */');
 panel=exact(panel,"await require('./local-google-client.cjs').importLocalGoogleClient({vault,resourcesPath:process.resourcesPath,localAppData:process.env.LOCALAPPDATA});",'/* Do not import registrations from another edition. */');
-panel=exact(panel,"return {prefs,menu:panelMode,expanded,version:'1.0.10'};","return {prefs,menu:panelMode,expanded,version:'1.0.12-aiweb.2',aiWeb:aiWeb.state()};");
+panel=exact(panel,"return {prefs,menu:panelMode,expanded,version:'1.0.10'};","return {prefs,menu:panelMode,expanded,version:'1.0.12-aiweb.3',aiWeb:aiWeb.state()};");
 panel=exact(panel,'function hide(){active=false;','function hide(){aiWeb.hide();active=false;');
 panel=exact(panel,"if(!origin||!rect||panelMode==='ai')","if(!origin||!rect||(panelMode==='ai'&&prefs.aiMode!=='web'))");
 panel=exact(panel,'{hide();return;}ensurePanel();active=true;',`{hide();return;}
@@ -46,11 +44,10 @@ const oldHost=lf(fs.readFileSync(path.join(root,'../electimes-110/workpanel/src/
 const newHost=require('./host-changes.cjs')(oldHost,exact);new vm.Script(newHost);
 const patchHost=source=>exact(lf(source),oldHost,newHost);
 js('out/preload/index.js',patchHost(a.content(archive,'out/preload/index.js').toString()));
-Object.assign(pkg,{name:'electimes-office-ai-web-test',productName:'전기신문 Office AI 웹 테스트',version:'1.0.12-aiweb.2',electimesModificationNotice:'Isolated official account and CLI panel test on published 1.0.12. Production profile, associations and automatic updates remain separate. Original notices preserved.'});
+Object.assign(pkg,{name:'electimes-office-ai-web-test',productName:'전기신문 Office AI 웹 테스트',version:'1.0.12-aiweb.3',electimesModificationNotice:'Isolated real Chrome/Edge browser companion test on published 1.0.12. Production profile, associations and automatic updates remain separate. Original notices preserved.'});
 replace.set('package.json',Buffer.from(JSON.stringify(pkg,null,2)));
 fs.cpSync(base,out,{recursive:true,filter:p=>!['$PLUGINSDIR','Uninstall.exe','uninstall.exe'].includes(path.basename(p))});
-for(const pkg of ['jose','node-pty']){const src=path.join(root,'node_modules',pkg),dst=path.join(out,'resources/ai-runtime/node_modules',pkg);fs.cpSync(src,dst,{recursive:true,filter:p=>!p.endsWith('.pdb')&&!p.includes('win32-arm64')&&!p.includes(path.sep+'src'+path.sep)&&!p.includes(path.sep+'deps'+path.sep)&&!p.includes(path.sep+'third_party'+path.sep)});}
-for(const pkg of ['@xterm/xterm','@xterm/addon-fit']){const dst=path.join(out,'resources/ai-runtime/notices',pkg.replace('/','-'));fs.mkdirSync(dst,{recursive:true});fs.copyFileSync(path.join(root,'node_modules',pkg,'LICENSE'),path.join(dst,'LICENSE'));}
+fs.copyFileSync(path.join(root,'browser-companion.exe'),path.join(out,'resources/browser-companion.exe'));
 fs.renameSync(path.join(out,'Electimes Office.exe'),path.join(out,'ElectimesOffice-AIWeb-Test.exe'));
 fs.writeFileSync(path.join(out,'resources/app.asar'),a.rewriteArchive(original,replace));
 const changed=new Set(['resources/app.asar','resources/electimes-version.json','resources/electimes-update-source.json','resources/app-update.yml']);

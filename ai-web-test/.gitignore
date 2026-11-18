@@ -8,3 +8,6 @@ __pycache__/
 *-windows.json
 *-windows.png
 startup-*.txt
+
+browser-companion.exe
+browser-desktop-*.png

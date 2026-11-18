@@ -20,7 +20,7 @@ try{
  $prodProfile=Join-Path $env:APPDATA 'Electimes Office'
  New-Item -ItemType Directory $prodProfile -Force|Out-Null
  $prodMarker=Join-Path $prodProfile 'ai-web-test-preservation.txt';[IO.File]::WriteAllText($prodMarker,'production profile remains untouched')
- $compact="$root/dist/ElectimesOffice-AIWeb-Test-1.0.12.2-Compact-Setup.exe"
+ $compact="$root/dist/ElectimesOffice-AIWeb-Test-1.0.12.3-Compact-Setup.exe"
  $resource=Join-Path $prod 'resources/electimes-version.json';$original=[IO.File]::ReadAllBytes($resource)
  [IO.File]::WriteAllText($resource,'{"version":"wrong"}')
  Install $compact $target 4
@@ -44,7 +44,7 @@ try{
  if([IO.File]::ReadAllText((Join-Path $target '사용자 문서 보존.txt')) -ne 'keep user file'){throw 'User document removed'}
  if(Test-Path (Join-Path $target 'ElectimesOffice-AIWeb-Test.exe')){throw 'Test executable left behind'}
  Verify $prod $base;$report.uninstallPreservesUserFiles=$true
- Install "$root/dist/ElectimesOffice-AIWeb-Test-1.0.12.2-Full-Setup.exe" $fullTarget
+ Install "$root/dist/ElectimesOffice-AIWeb-Test-1.0.12.3-Full-Setup.exe" $fullTarget
  Verify $fullTarget $manifest;$report.full=$true
  # Both applications must be able to run concurrently with distinct profiles.
  $production=Start-Process -FilePath (Join-Path $prod 'Electimes Office.exe') -PassThru
@@ -53,7 +53,7 @@ try{
   for($i=0;$i -lt 30;$i++){
    Start-Sleep -Seconds 1;$production.Refresh();$test.Refresh()
    if($production.HasExited -or $test.HasExited){throw 'Side-by-side startup exited'}
-   if($production.MainWindowHandle -ne 0 -and $test.MainWindowHandle -ne 0){break}
+   if($production.MainWindowHandle -ne 0 -and $test.MainWindowHandle -ne 0 -and $test.MainWindowTitle -match 'AI 웹 테스트'){break}
   }
   if(!$production.MainWindowHandle -or !$test.MainWindowHandle){throw 'Side-by-side windows unavailable'}
   if($test.MainWindowTitle -notmatch 'AI 웹 테스트'){throw 'Test edition is not clearly identified'}

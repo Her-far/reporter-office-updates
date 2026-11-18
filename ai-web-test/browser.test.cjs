@@ -1,0 +1,5 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs'),path=require('node:path');
+const {makeSync}=require('./browser-companion.cjs');
+test('Native geometry allows negative multi-monitor coordinates and rejects invalid inputs',()=>{assert.deepEqual(makeSync('claude',{x:-1920.4,y:30,width:600.2,height:750},true),{action:'sync',provider:'claude',x:-1920,y:30,width:600,height:750,visible:true,raise:false});assert.throws(()=>makeSync('unknown',{},true));assert.throws(()=>makeSync('claude',{x:NaN,y:0,width:600,height:700},true));});
+test('Patched host parses and exposes website controls instead of terminal or account controls',()=>{const src=fs.readFileSync(path.join(__dirname,'../electimes-110/workpanel/src/host-preload.cjs'),'utf8').replace(/\r\n/g,'\n');const exact=(s,a,b)=>{assert.equal(s.split(a).length,2);return s.replace(a,()=>b);};const out=require('./host-changes.cjs')(src,exact);new vm.Script(out);assert(out.includes('AI 웹 브라우저'));assert(out.includes('wp-ai-web-launch'));assert(!out.includes('cli-start'));});

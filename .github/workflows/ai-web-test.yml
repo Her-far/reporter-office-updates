@@ -1,4 +1,4 @@
-name: Build isolated Office subscription panel test
+name: Build isolated Office real-browser test
 on:
   push:
     branches: [test/electimes-ai-web-20261118]
@@ -35,14 +35,16 @@ jobs:
           if ((Get-FileHash base.exe -Algorithm SHA256).Hash.ToLowerInvariant() -ne '8060e3e6e89bf33aed3d3a99fa00d1ea8e85cba22d42c3bc6693b47a38604431') { throw 'Incorrect baseline' }
           & 'C:\Program Files\7-Zip\7z.exe' x base.exe -obase -y | Out-Null
           if ($LASTEXITCODE -ne 0) { throw 'Extraction failed' }
-          node --test plan.test.cjs
+          & "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe" /nologo /target:exe /platform:x64 /reference:System.Web.Extensions.dll /out:browser-companion.exe browser-bridge.cs
+          if ($LASTEXITCODE -ne 0) { throw 'Browser helper compilation failed' }
+          node --test browser.test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Provider boundary tests failed' }
           node build.cjs base stage
           if ($LASTEXITCODE -ne 0) { throw 'Test edition build failed' }
       - name: Exercise packaged Windows AI panel
         timeout-minutes: 16
         run: |
-          node ui-test.cjs
+          node browser-ui-test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'AI panel verification failed' }
       - name: Package compact and complete test installers
         run: |

@@ -1,52 +1,29 @@
 'use strict';
-const {app,WebContentsView,ipcMain,net,shell,clipboard,Menu}=require('electron');
-const path=require('node:path');const {PlanAuth}=require('./plan-auth.cjs'),{PlanChat}=require('./plan-chat.cjs'),{OfficialCLI}=require('./official-cli.cjs');
+const {app,screen,clipboard}=require('electron'),fs=require('node:fs'),path=require('node:path');
+const {BrowserCompanion,providers,makeSync}=require('./browser-companion.cjs');
 function create(deps){
- let view=null,selected='chatgpt',visible=false,closed=false,error='',emitTimer=null;
- const runtime=path.join(process.resourcesPath,'ai-runtime/node_modules');
- const auth=new PlanAuth({vault:deps.vault,initialized:app.whenReady(),fetch:(...args)=>net.fetch(...args),openExternal:u=>shell.openExternal(u),jose:require(path.join(runtime,'jose')),changed:emit});
- const chat=new PlanChat({auth,vault:deps.vault,fetch:(...args)=>net.fetch(...args),changed:emit});
- const cli=new OfficialCLI({root:path.join(app.getPath('userData'),'subscription-panel'),fetch:(...args)=>net.fetch(...args),pty:require(path.join(runtime,'node-pty')),changed:emit,event:e=>{if(view&&!view.webContents.isDestroyed())view.webContents.send('plan:terminal',e);}});
- const ready=Promise.all([auth.ready,chat.ready]).then(()=>{if(auth.current()?.access)void auth.models().catch(e=>{error=e.message;emit();});}).catch(e=>{error=e.message;});
- function state(){return {provider:selected,error,auth:auth.state(),chat:chat.state(),cli:selected==='chatgpt'?null:cli.state(selected)};}
- function emit(){if(closed||emitTimer)return;emitTimer=setTimeout(()=>{emitTimer=null;if(view&&!view.webContents.isDestroyed())view.webContents.send('plan:state',state());},60);}
- function trusted(e){return !!view&&e.sender===view.webContents&&e.senderFrame===view.webContents.mainFrame;}
- async function action(p){await ready;error='';const a=p?.action,x=p?.value;
-  if(a==='state')return state();
-  if(a==='login'){if(chat.abort)throw Error('답변을 중지한 뒤 연결해 주세요.');await auth.start(x?.id||undefined,{consent:x?.consent===true});}
-  else if(a==='cancel-login')auth.cancel();
-  else if(a==='logout'){chat.stop();await auth.logout();}
-  else if(a==='account'){if(chat.abort)throw Error('답변을 중지한 뒤 계정을 바꿔 주세요.');await auth.select(x);}
-  else if(a==='acknowledge')await auth.acknowledge();
-  else if(a==='models')await auth.models();
-  else if(a==='send'){if(selected!=='chatgpt')throw Error('서비스를 확인해 주세요.');void chat.send(x).catch(e=>{error=e.message;emit();});}
-  else if(a==='stop')chat.stop();
-  else if(a==='new')await chat.newThread();
-  else if(a==='thread')await chat.select(x);
-  else if(a==='delete-thread')await chat.remove();
-  else if(a==='usage')await shell.openExternal('https://chatgpt.com/');
-  else if(a==='copy'){if(typeof x!=='string'||x.length>500000)throw Error('복사할 내용을 확인해 주세요.');clipboard.writeText(x);}
-  else if(a==='source'){const u=new URL(x);if(u.protocol!=='https:'||u.username||u.password)throw Error('지원하지 않는 링크입니다.');await shell.openExternal(u.href);}
-  else if(a==='cli-install'){if(selected==='chatgpt')return;void cli.install(selected).catch(e=>{error=e.message;emit();});}
-  else if(a==='cli-start'){if(selected==='chatgpt')return;cli.start(selected,x?.cols,x?.rows);}
-  else if(a==='cli-stop'){if(selected!=='chatgpt')cli.stop(selected);}
-  else if(a==='paste-document'){const owner=deps.owner();if(!deps.isDocument(owner))throw Error('문서 탭을 열고 붙여넣을 위치를 선택해 주세요.');if(typeof x==='string'&&x.length<=500000)clipboard.writeText(x);if(!clipboard.readText())throw Error('먼저 답변을 복사해 주세요.');owner.focus();owner.pasteAndMatchStyle();}
-  emit();return state();
- }
- ipcMain.handle('plan:action',async(e,p)=>{if(!trusted(e))throw Error('forbidden');try{return {ok:true,state:await action(p)};}catch(e){error=e.message||'요청을 처리하지 못했습니다.';emit();return {ok:false,error};}});
- ipcMain.on('plan:input',(e,p)=>{if(!trusted(e)||!visible||p?.provider!==selected||selected==='chatgpt')return;try{cli.input(selected,p.data);}catch{}});
- ipcMain.on('plan:resize',(e,p)=>{if(!trusted(e)||!['claude','gemini'].includes(p?.provider))return;cli.resize(p.provider,p.cols,p.rows);});
- function ensure(){if(view&&!view.webContents.isDestroyed())return;view=new WebContentsView({webPreferences:{preload:path.join(__dirname,'plan-preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,spellcheck:true,partition:'office-subscription-local'}});
-  const wc=view.webContents;wc.setWindowOpenHandler(()=>({action:'deny'}));wc.on('will-navigate',e=>e.preventDefault());wc.on('will-attach-webview',e=>e.preventDefault());wc.on('did-finish-load',emit);
-  wc.on('before-input-event',(e,input)=>{if(visible&&input.type==='keyDown'&&input.key==='Escape'&&!input.isComposing&&deps.expanded()){e.preventDefault();deps.restore();}});
-  wc.on('context-menu',(_e,p)=>Menu.buildFromTemplate([{role:'copy',enabled:!!p.selectionText},{role:'paste',enabled:p.isEditable},{role:'selectAll'}]).popup({window:deps.window()}));
-  wc.on('render-process-gone',()=>{for(const id of cli.items.keys())cli.stop(id);view=null;error='대화 화면이 종료됐습니다. 패널을 다시 열어 주세요.';});
-  view.setVisible(false);void wc.loadFile(path.join(__dirname,'plan-panel.html')).catch(e=>{error=e.message;emit();});
- }
- function hide(){visible=false;view?.setVisible(false);}
- function show(id,bounds){if(closed)return;selected=['chatgpt','claude','gemini'].includes(id)?id:'chatgpt';ensure();deps.window().contentView.addChildView(view);view.setBounds(bounds);view.setVisible(true);visible=true;emit();}
- async function command(a,owner){if(a==='paste-document')await action({action:a});else if(a==='paste-ai'){view?.webContents.focus();view?.webContents.pasteAndMatchStyle();}else if(a==='new'&&selected==='chatgpt')await action({action:'new'});deps.changed();}
- function close(){if(closed)return;closed=true;clearTimeout(emitTimer);auth.close();chat.stop();cli.close();if(view&&!view.webContents.isDestroyed())view.webContents.close();ipcMain.removeHandler('plan:action');}
- return {state:()=>({provider:selected,error}),show,hide,command,close};
+ let bridge=null,initializing=null,selected='chatgpt',browser='chrome',browsers=[],windows={},visible=false,bounds=null,busy=false,error='',closed=false,syncing=false,dirty=false,raise=false,last='',bound=false;
+ const prefs=()=>path.join(app.getPath('userData'),'browser-companion.json');
+ try{const p=JSON.parse(fs.readFileSync(prefs(),'utf8'));if(['chrome','edge'].includes(p.browser))browser=p.browser;}catch{}
+ function state(){return {provider:selected,browser,browsers,windows,busy,error,version:3};}
+ function notify(){const s=JSON.stringify(state());if(s!==last){last=s;deps.changed();}}
+ async function ensure(){if(bridge)return;if(initializing)return initializing;initializing=(async()=>{const w=deps.window();if(!w||w.isDestroyed())return;const h=w.getNativeWindowHandle();const hwnd=h.length>=8?h.readBigUInt64LE().toString():String(h.readUInt32LE());bridge=new BrowserCompanion({executable:path.join(process.resourcesPath,'browser-companion.exe'),hwnd,pid:process.pid,onExit:()=>{if(!closed){bridge=null;windows={};error='브라우저 연결이 종료됐습니다. 열기를 눌러 다시 연결해 주세요.';notify();}}});const result=await bridge.call({action:'list'});browsers=result.browsers;windows=result.windows;if(!browsers.includes(browser))browser=browsers[0]||'chrome';if(!bound){bound=true;w.on('move',()=>schedule());w.on('resize',()=>schedule());w.on('minimize',()=>schedule());w.on('restore',()=>schedule(true));w.on('focus',()=>schedule(true));w.on('hide',()=>schedule());w.on('show',()=>schedule(true));}notify();})().finally(()=>{initializing=null;});return initializing;}
+ function rect(){const w=deps.window();if(!w||w.isDestroyed()||!bounds)return null;const c=w.getContentBounds(),d={x:c.x+bounds.x,y:c.y+bounds.y,width:bounds.width,height:bounds.height};return screen.dipToScreenRect(w,d);}
+ function schedule(focus=false){if(closed)return;dirty=true;raise=raise||focus;void sync();}
+ async function sync(){if(syncing||!bridge||closed)return;syncing=true;try{while(dirty&&!closed){dirty=false;const w=deps.window(),r=rect();const msg=makeSync(selected,r,visible&&!!r&&!!w&&!w.isDestroyed()&&!w.isMinimized()&&w.isVisible(),raise);raise=false;windows=await bridge.call(msg);notify();}}catch(e){if(!closed){error=e.message;notify();}}finally{syncing=false;}}
+ async function command(a,owner){if(typeof a!=='string')return;error='';try{
+  if(a==='paste-document'){if(!deps.isDocument(owner))throw Error('문서를 열고 붙여넣을 위치를 선택해 주세요.');if(!clipboard.readText())throw Error('웹사이트에서 답변을 먼저 복사해 주세요.');owner.focus();owner.pasteAndMatchStyle();return;}
+  if(a.startsWith('browser:')){const choice=a.slice(8);if(!['chrome','edge'].includes(choice))return;browser=choice;fs.writeFileSync(prefs(),JSON.stringify({browser}));notify();return;}
+  if(!['open','detach','refresh-state'].includes(a)||busy)return;
+  await ensure();if(!bridge)throw Error('브라우저를 준비하지 못했습니다.');
+  if(a==='open'){busy=true;notify();await deps.prepareBrowser();windows=await bridge.call({action:'open',provider:selected,browser});schedule(true);}
+  else if(a==='detach'){windows=await bridge.call({action:'detach',provider:selected});}
+  else windows=await bridge.call({action:'state'});
+ }catch(e){error=e.message||'브라우저를 열지 못했습니다.';}finally{busy=false;notify();}}
+ function show(id,r){selected=Object.hasOwn(providers,id)?id:'chatgpt';visible=true;bounds=r;void ensure().then(()=>schedule()).catch(e=>{error=e.message;notify();});}
+ function hide(){visible=false;schedule();}
+ const timer=setInterval(()=>{if(!closed&&bridge&&Object.keys(windows).length&&!busy)schedule();},1200);timer.unref();
+ function close(){if(closed)return;closed=true;clearInterval(timer);if(bridge)void bridge.close().catch(()=>{});}
+ return {state,show,hide,command,close};
 }
 module.exports={create,isRemote:()=>false};
