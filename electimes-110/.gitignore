@@ -1,0 +1,13 @@
+node_modules/
+*.exe
+base-installer/
+stage/
+package/
+installer-check/
+*-windows.json
+windows-smoke.json
+startup-*.txt
+payload-manifest.json
+electimes-latest.json
+ElectimesOffice-SHA256SUMS-*.txt
+__pycache__/

@@ -1,0 +1,95 @@
+name: Electimes Office 1.0.10 home panel recovery
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/electimes-110.yml', 'electimes-110/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: electimes-production-release
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging and native test tools
+        working-directory: electimes-110
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          npm install --no-save --ignore-scripts playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Test tools installation failed' }
+      - name: Apply audited overlay to the exact published 1.0.9
+        working-directory: electimes-110
+        shell: pwsh
+        run: |
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          curl.exe --fail --location --retry 3 -o base.exe https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.9/ElectimesOffice-Setup-1.0.9-x64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Verified base download failed' }
+          python rebuild.py --stage-only
+          if ($LASTEXITCODE -ne 0) { throw 'Overlay or resource preservation failed' }
+      - name: Verify home position, expansion, return button and Escape
+        timeout-minutes: 5
+        working-directory: electimes-110
+        shell: pwsh
+        run: |
+          node home-panel.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Home panel native regression failed' }
+      - name: Verify editor collapse, side changes and common width
+        timeout-minutes: 5
+        working-directory: electimes-110
+        shell: pwsh
+        run: |
+          node panel-layout.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Editor panel native regression failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-110-native-validation
+          path: |
+            electimes-110/*-windows.json
+            electimes-110/startup-quit-*.txt
+            electimes-110/stage/BUILD-VERIFICATION.json
+      - name: Package and verify fresh install and 1.0.9 upgrade
+        working-directory: electimes-110
+        shell: pwsh
+        run: |
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          python rebuild.py
+          if ($LASTEXITCODE -ne 0) { throw 'Packaging or payload comparison failed' }
+          ./smoke.ps1
+      - name: Publish verified installer and company update channel
+        working-directory: electimes-110
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create electimes-v1.0.10 ElectimesOffice-Setup-1.0.10-x64.exe ElectimesOffice-SHA256SUMS-1.0.10.txt home-panel-windows.json panel-layout-windows.json windows-smoke.json --title '전기신문 Office 1.0.10 — 홈 패널 위치·확대 복귀 수정' --notes-file release-notes.txt --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          $feed = Get-Content -Raw electimes-latest.json
+          Set-Location ..
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --ff-only origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Refresh channel head failed' }
+          $current = Get-Content -Raw electimes-latest.json | ConvertFrom-Json
+          if ($current.build -ge 110) { throw 'A newer or same release already owns the channel' }
+          [IO.File]::WriteAllText((Join-Path $PWD 'electimes-latest.json'), $feed, [Text.UTF8Encoding]::new($false))
+          git add electimes-latest.json
+          git commit -m 'release: publish Electimes Office 1.0.10 home panel recovery'
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Update channel publication failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-110-validation
+          path: |
+            electimes-110/*-windows.json
+            electimes-110/windows-smoke.json
+            electimes-110/startup-*.txt
