@@ -35,7 +35,7 @@ function register(deps){
   let saving=Promise.resolve();
   function persist(){const json=JSON.stringify(prefs,null,2);saving=saving.catch(()=>{}).then(async()=>{await fsp.mkdir(dir(),{recursive:true});await fsp.writeFile(config()+'.tmp',json,{mode:0o600});await fsp.rename(config()+'.tmp',config());});return saving;}
   function hostState(){return {prefs,menu:panelMode,expanded,version:'1.0.13'};}
-  function aiState(){const id=prefs.aiWebService,st=aiStatus.get(id)||{},v=aiViews.get(id);return {enabled:prefs.aiWebEnabled,service:id,services:aiWeb.SERVICE_IDS.map(k=>({id:k,label:aiWeb.SERVICES[k].label})),error:st.error||'',ready:!!st.ready,canGoBack:!!(v&&!v.webContents.isDestroyed()&&v.webContents.navigationHistory.canGoBack())};}
+  function aiState(){const id=prefs.aiWebService,st=aiStatus.get(id)||{},v=aiViews.get(id);return {enabled:prefs.aiWebEnabled,service:id,services:aiWeb.SERVICE_IDS.map(k=>({id:k,label:aiWeb.SERVICES[k].label})),error:id==='chatgpt'?managed.state().error:st.error||'',ready:!!st.ready,canGoBack:!!(v&&!v.webContents.isDestroyed()&&v.webContents.navigationHistory.canGoBack())};}
   function downloadRoot(){return prefs.downloadFolder||app.getPath('downloads');}
   function state(){return {...hostState(),downloadFolder:downloadRoot(),notes:notes.snapshot(),notesError,notesWarning:notes.warning,calendar:calendar.status(),calendars:calendar.calendars,events:calendar.events,range,reader:reader.status(),mail:{enabled:prefs.mailEnabled,error:mailError,ready:mailReady},aiWeb:aiState(),downloads:[...downloads.values()].slice(-50).map(({id,name,status,bytes})=>({id,name,status,bytes})),dark:nativeTheme.shouldUseDarkColors};}
   function emit(){revision++;if(panel&&!panel.webContents.isDestroyed())panel.webContents.send('wp:state',state());}
@@ -49,7 +49,21 @@ function register(deps){
   });}
   function activeHost(wc){if(!wc||wc.isDestroyed()||!deps.isHost(wc))return false;const win=deps.window();if(!win||win.isDestroyed())return false;const m=deps.manager();if(!m)return wc===win.webContents;const current=m.list().find(t=>t.active);return wc===win.webContents?current?.kind==='home':m.tabIdForWebContents(wc.id)===current?.id;}
   function hostOrigin(){const win=deps.window();if(!win||!owner||!activeHost(owner)||win.isMinimized())return null;if(owner===win.webContents)return {x:0,y:0,width:win.getContentBounds().width,height:win.getContentBounds().height};const child=win.contentView.children.find(v=>v.webContents===owner);return child&&child.getVisible()?child.getBounds():null;}
-  function hide(){active=false;panel?.setVisible(false);mail?.setVisible(false);if(mail&&!mail.webContents.isDestroyed())mail.webContents.setAudioMuted(true);hideAi();}
+  const managed = require('./desktop-chat.cjs').create({
+    window: deps.window, changed: emit, prepareBrowser: async () => {}, isDocument: () => false
+  });
+  let chatVisible = false;
+  function hideChat() {
+    if (chatVisible) managed.hide();
+    chatVisible = false;
+  }
+  function showChat(bounds) {
+    const first = !chatVisible;
+    chatVisible = true;
+    managed.show('chatgpt', bounds);
+    if (first) void managed.command('open');
+  }
+  function hide(){hideChat();active=false;panel?.setVisible(false);mail?.setVisible(false);if(mail&&!mail.webContents.isDestroyed())mail.webContents.setAudioMuted(true);hideAi();}
   function hideAi(except){for(const [id,v] of aiViews){if(v===except)continue;v.setVisible(false);if(!v.webContents.isDestroyed())v.webContents.setAudioMuted(true);}}
   function layout(){if(closing)return;const origin=hostOrigin();if(!origin||!rect||panelMode==='ai'){hide();return;}
     const zoom=owner.getZoomFactor();const r={x:Math.round(origin.x+rect.x*zoom),y:Math.round(origin.y+rect.y*zoom),width:Math.round(rect.width*zoom),height:Math.round(rect.height*zoom)};
@@ -59,8 +73,9 @@ function register(deps){
     if(panelMode==='mail'&&prefs.mailDisplay==='web'&&prefs.mailEnabled&&mailRect&&!mailModal){ensureMail();const z=panel.webContents.getZoomFactor();const m={x:Math.round(r.x+mailRect.x*z),y:Math.round(r.y+mailRect.y*z),width:Math.min(Math.round(mailRect.width*z),r.width),height:Math.min(Math.round(mailRect.height*z),r.height-Math.round(mailRect.y*z))};if(m.width>50&&m.height>50){win.contentView.addChildView(mail);mail.setBounds(m);mail.setVisible(true);mail.webContents.setAudioMuted(false);}}
     else {mail?.setVisible(false);mail?.webContents.setAudioMuted(true);}
     // mailRect is the panel's remote-page slot; the web AI page uses the same slot.
-    let shown=null;
-    if(panelMode==='aiweb'&&prefs.aiWebEnabled&&mailRect&&!mailModal){const v=ensureAi(prefs.aiWebService),z=panel.webContents.getZoomFactor();const m={x:Math.round(r.x+mailRect.x*z),y:Math.round(r.y+mailRect.y*z),width:Math.min(Math.round(mailRect.width*z),r.width),height:Math.min(Math.round(mailRect.height*z),r.height-Math.round(mailRect.y*z))};if(m.width>50&&m.height>50){win.contentView.addChildView(v);v.setBounds(m);v.setVisible(true);v.webContents.setAudioMuted(false);shown=v;}}
+    let shown=null, showingChat=false;
+    if(panelMode==='aiweb'&&prefs.aiWebEnabled&&mailRect&&!mailModal){const z=panel.webContents.getZoomFactor();const m={x:Math.round(r.x+mailRect.x*z),y:Math.round(r.y+mailRect.y*z),width:Math.min(Math.round(mailRect.width*z),r.width),height:Math.min(Math.round(mailRect.height*z),r.height-Math.round(mailRect.y*z))};if(m.width>50&&m.height>50 && prefs.aiWebService==='chatgpt'){showingChat=true;showChat(m);}else if(m.width>50&&m.height>50){const v=ensureAi(prefs.aiWebService);win.contentView.addChildView(v);v.setBounds(m);v.setVisible(true);v.webContents.setAudioMuted(false);shown=v;}}
+    if(!showingChat) hideChat();
     hideAi(shown);
   }
   function aiSession(id){let s=aiSessions.get(id);if(s)return s;s=session.fromPartition(aiWeb.partitionOf(id));
@@ -225,7 +240,7 @@ function register(deps){
       else if(a==='ai-back'){const v=aiViews.get(prefs.aiWebService);if(v?.webContents.navigationHistory.canGoBack())v.webContents.navigationHistory.goBack();}
       else if(a==='ai-reload'){const v=aiViews.get(prefs.aiWebService);if(v&&!v.webContents.isDestroyed())v.webContents.reload();else layout();}
       else if(a==='ai-link'){if(!prefs.aiWebEnabled)throw Error('ai-disabled');const u=httpsUrl(String(x||'').trim()),id=u&&aiWeb.serviceOf(u.href);if(!id)throw Error('ai-link');prefs=settingsOf({aiWebService:id},prefs);await persist();layout();const v=ensureAi(id);await v.webContents.loadURL(u.href).catch(()=>{});}
-      else if(a==='ai-login'){if(!prefs.aiWebEnabled)throw Error('ai-disabled');openAiLogin(prefs.aiWebService);}
+      else if(a==='ai-login'){if(!prefs.aiWebEnabled)throw Error('ai-disabled');if(prefs.aiWebService==='chatgpt')await managed.command('open');else openAiLogin(prefs.aiWebService);}
       else if(a==='ai-browser')await openAiBrowser(prefs.aiWebService);
       else if(a==='ai-external')await external(aiWeb.SERVICES[prefs.aiWebService].home);
       else if(a==='ai-reset')await resetAi(prefs.aiWebService);
@@ -254,7 +269,7 @@ function register(deps){
     }catch(err){return {ok:false,error:String(err.message).slice(0,100)};}});
   nativeTheme.on('updated',emit);
   function attach(){const m=deps.manager();if(m&&!m.__workPanelLayout){m.__workPanelLayout=true;const original=m.layout.bind(m);m.layout=(...args)=>{const result=original(...args);layout();const win=deps.window();for(const wc of [win?.webContents,...(win?.contentView.children||[]).map(v=>v.webContents)].filter(Boolean))if(!wc.isDestroyed()&&deps.isHost(wc))wc.send('wp:refresh');return result;};}const w=deps.window();if(w&&!w.__workPanelAttached){w.__workPanelAttached=true;w.on('minimize',hide);w.on('restore',layout);w.on('resize',layout);w.on('closed',()=>{reader.close();for(const popup of popups)popup.close();for(const v of [panel,mail,...aiViews.values()]){const wc=v?.webContents;if(wc&&!wc.isDestroyed())wc.close();}panel=mail=null;aiViews.clear();});}}
-  app.on('before-quit',event=>{if(!notesQuitReady&&notes.flushRequired&&event?.preventDefault){event.preventDefault();notes.flush().then(()=>{notesQuitReady=true;setImmediate(()=>app.quit());}).catch(()=>{void dialog.showMessageBox(deps.window(),{type:'error',message:'메모를 저장하지 못해 종료를 중단했습니다.',detail:'메모 내용을 복사해 보관하고 저장 공간을 확인해 주세요.'});});return;}closing=true;clearInterval(timer);calendar.close();reader.close();for(const w of popups)w.close();for(const v of [panel,mail,...aiViews.values()]){const wc=v?.webContents;if(wc&&!wc.isDestroyed())wc.close();}});
+  app.on('before-quit',event=>{if(!notesQuitReady&&notes.flushRequired&&event?.preventDefault){event.preventDefault();notes.flush().then(()=>{notesQuitReady=true;setImmediate(()=>app.quit());}).catch(()=>{void dialog.showMessageBox(deps.window(),{type:'error',message:'메모를 저장하지 못해 종료를 중단했습니다.',detail:'메모 내용을 복사해 보관하고 저장 공간을 확인해 주세요.'});});return;}closing=true;managed.close();clearInterval(timer);calendar.close();reader.close();for(const w of popups)w.close();for(const v of [panel,mail,...aiViews.values()]){const wc=v?.webContents;if(wc&&!wc.isDestroyed())wc.close();}});
   installed={attach,layout};return installed;
 }
 module.exports={register,attach:()=>installed?.attach(),isMailContents:wc=>mailContents.has(wc)};
