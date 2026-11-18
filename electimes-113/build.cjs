@@ -63,10 +63,10 @@ function replaceHost(t) {
   const next = t.replace(variants[0], () => newHost); new vm.Script(next); return next;
 }
 replacements.set('out/preload/index.js', Buffer.from(replaceHost(asar.content(archive, 'out/preload/index.js').toString())));
-for(const [source,target] of [['ai-web.cjs','desktop-chat.cjs'],['browser-companion.cjs','browser-companion.cjs']]) {
-  const code = fs.readFileSync(path.join(__dirname,'browser',source),'utf8');
-  new vm.Script(code);
-  replacements.set(wp + target, Buffer.from(code));
+for (const name of ['plan-auth.cjs','plan-chat.cjs','plan-view.cjs','plan-preload.cjs','plan-panel.js','plan-panel.css','plan-panel.html']) {
+  const bytes = fs.readFileSync(path.join(__dirname,'subscription',name));
+  if (/\.c?js$/.test(name)) new vm.Script(bytes.toString());
+  replacements.set(wp + name, bytes);
 }
 pkg.version = TO.version;
 pkg.electimesModificationNotice = 'Web AI (official ChatGPT, Claude and Gemini pages in isolated sessions) in the work panel; the bundled command line starts Electimes Office.exe and uses the Electimes Office profile. All 1.0.12 fixes and original notices retained.';
@@ -75,7 +75,7 @@ replacements.set('package.json', Buffer.from(JSON.stringify(pkg, null, 2)));
 fs.cpSync(base, out, { recursive: true, filter: p => !['$PLUGINSDIR', 'Uninstall.exe', 'uninstall.exe'].includes(path.basename(p)) });
 fs.writeFileSync(path.join(out, 'resources/app.asar'), asar.rewriteArchive(original, replacements));
 
-fs.copyFileSync(path.join(__dirname,'browser/browser-companion.exe'),path.join(out,'resources/browser-companion.exe'));
+fs.cpSync(path.join(__dirname,'subscription/jose'),path.join(out,'resources/ai-runtime/node_modules/jose'),{recursive:true});
 const cliDir = path.join(out, 'resources/cli');
 const input = Object.fromEntries(CLI_FILES.map(f => [f, fs.readFileSync(path.join(cliDir, f), 'utf8')]));
 const patched = patchCli(input);

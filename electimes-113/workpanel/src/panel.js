@@ -110,22 +110,20 @@ function aiWebView(){const w=state.aiWeb,n=el('div','mail-shell ai-shell'),bar=e
  const extra=el('div','mail-extra ai-extra');
  const zoom=el('select','mail-zoom');zoom.setAttribute('aria-label','웹 AI 화면 배율');for(const value of [0.65,0.75,0.85,1,1.1,1.25]){const o=el('option','',Math.round(value*100)+'%');o.value=value;zoom.append(o);}zoom.value=state.prefs.aiWebZoom||1;zoom.onchange=()=>setting({aiWebZoom:Number(zoom.value)});
  const link=el('form','ai-link'),input=el('input');input.type='url';input.placeholder='이메일로 받은 로그인 링크 붙여넣기';input.setAttribute('aria-label','로그인 링크');link.append(input,button('이동',()=>link.requestSubmit()));link.onsubmit=e=>{e.preventDefault();if(input.value.trim())void action('ai-link',input.value.trim());};
- if(w.service==='chatgpt'){
-   extra.append(button('ChatGPT 창 열기',()=>action('ai-login')));
- }else{
+ if(w.service!=='chatgpt'){
  extra.append(button('로그인 창 열기',()=>action('ai-login'),'primary ai-login-open'),button('처음 화면',()=>action('ai-home')),button('Edge 창으로 열기',()=>action('ai-browser')),button('기본 브라우저에서 열기',()=>action('ai-external')),link,zoom,button(label+' 로그아웃',()=>action('ai-reset'),'danger'));
  extra.append(el('p','sub','로그인은 별도 창에서 하고, 끝나면 창이 닫히며 패널에 반영됩니다. 그래도 안 되면 Edge 창으로 여세요(평소 브라우저의 로그인 사용).'));
  }
  more.append(extra);
- if(w.service==='chatgpt') bar.append(tabs,expand,more);
+ if(w.service==='chatgpt') bar.append(tabs,expand);
  else bar.append(tabs,back,reload,expand,more);
  n.append(bar);
  if(!w.enabled){n.append(el('p','empty','업무 연동 설정에서 웹 AI를 켜 주세요.'));return n;}
- if(!state.prefs.aiWebNoticeSeen){const box=el('div','ai-notice');box.append(el('p','','처음 한 번 각 서비스에 로그인하면 이 PC에서 유지됩니다. 엠바고·미공개 원고, 취재원과 개인정보는 입력하지 마세요. 무료 계정의 대화는 서비스 회사의 AI 학습에 쓰일 수 있습니다.'),button('확인',()=>setting({aiWebNoticeSeen:true}),'primary'));n.append(box);}
+ if(w.service!=='chatgpt'&&!state.prefs.aiWebNoticeSeen){const box=el('div','ai-notice');box.append(el('p','','처음 한 번 각 서비스에 로그인하면 이 PC에서 유지됩니다. 엠바고·미공개 원고, 취재원과 개인정보는 입력하지 마세요. 무료 계정의 대화는 서비스 회사의 AI 학습에 쓰일 수 있습니다.'),button('확인',()=>setting({aiWebNoticeSeen:true}),'primary'));n.append(box);}
  if(w.error){const box=el('div','section error');box.append(el('span','',(w.service==='chatgpt'?w.error:errors[w.error])||'AI 화면을 다시 여세요.'),button('다시 시도',()=>action(w.service==='chatgpt'?'ai-login':'ai-reload')));n.append(box);}
- const slot=el('div','mail-slot');slot.setAttribute('aria-label',label+' 웹 화면');if(w.service==='chatgpt')slot.append(button('ChatGPT 창 열기',()=>action('ai-login')));
+ const slot=el('div','mail-slot');slot.setAttribute('aria-label',label+' 웹 화면');
  n.append(slot);
- n.append(el('div','mail-footer ai-footer','답변을 복사해 문서에 Ctrl+V로 붙여넣으세요 · '+label+' 공식 웹'));
+ if(w.service!=='chatgpt')n.append(el('div','mail-footer ai-footer','답변을 복사해 문서에 Ctrl+V로 붙여넣으세요 · '+label+' 공식 웹'));
  requestAnimationFrame(()=>{const report=()=>{if(!slot.isConnected||detail.open)return;const r=slot.getBoundingClientRect();api.mailBounds({x:r.x,y:r.y,width:r.width,height:r.height});};mailObserver=new ResizeObserver(report);mailObserver.observe(slot);report();});return n;}
 function renderAiWeb(){const w=state.aiWeb,key=JSON.stringify([w.service,w.enabled,w.error,state.prefs.aiWebNoticeSeen,state.prefs.aiWebZoom,state.expanded]);
  // Page loads emit often; keep the toolbar (and an open menu or typed link) unless something visible changed.

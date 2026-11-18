@@ -1,0 +1,11 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'none'"><title>AI 구독 대화</title><link rel="stylesheet" href="plan-panel.css"></head><body>
+<p id="error" role="status" hidden></p>
+<section id="chatgpt">
+ <div id="connect"><h2>구독 계정으로 대화하기</h2><p>브라우저에서 ChatGPT에 로그인하면 이 패널로 연결됩니다. 지원되는 구독의 사용 한도가 적용됩니다.</p><button id="login">Continue with ChatGPT</button><button id="cancel-login" hidden>로그인 취소</button><p class="muted">이곳의 대화는 ChatGPT 웹 대화 목록과 별도로 이 PC에 저장됩니다.</p></div>
+ <details id="manage" hidden><summary>계정 및 대화 관리</summary><div id="account-tools" class="row"><select id="accounts" aria-label="ChatGPT 계정"></select><button id="add-account">계정 추가</button><button id="reauth">다시 연결</button><button id="logout">연결 해제</button></div>
+
+ <div id="chat-tools" class="row"><select id="threads" aria-label="저장된 대화"></select><button id="new">새 대화</button><button id="delete-thread">삭제</button></div>
+ </details> <div id="welcome" hidden><strong>ChatGPT 구독을 사용합니다.</strong><p>이 패널의 요청은 ChatGPT 구독 한도 또는 연결된 크레딧 잔액을 사용합니다. 사용량은 ChatGPT 설정에서 관리할 수 있습니다.</p><button id="acknowledge">확인</button></div><div id="messages" aria-live="polite"></div>
+ <div id="composer"><div class="row"><select id="models" aria-label="모델"></select><button id="models-refresh" title="모델 목록 새로고침">↻</button><label><input id="search" type="checkbox"> 웹 검색</label></div><textarea id="prompt" rows="3" placeholder="질문을 입력하세요. Shift+Enter로 줄 바꿈" maxlength="80000"></textarea><div class="row"><span id="plan-label">ChatGPT 구독 사용</span><button id="usage">사용량 관리</button><button id="stop" hidden>중지</button><button id="send" class="primary">보내기</button></div><small>문서 내용은 자동으로 전송되지 않습니다.</small></div>
+</section>
+<script src="plan-panel.js"></script></body></html>
