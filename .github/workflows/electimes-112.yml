@@ -1,0 +1,60 @@
+name: Electimes Office 1.0.12 print dialog compatibility
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/electimes-112.yml', 'electimes-112/**']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: electimes-production-release
+  cancel-in-progress: true
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Build printer-dialog DPI adapter
+        working-directory: electimes-112
+        shell: pwsh
+        run: |
+          npm install --no-save --ignore-scripts node-gyp@11.5.0 playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Build tools installation failed' }
+          Push-Location native
+          ../node_modules/.bin/node-gyp.cmd rebuild --target=43.7.6 --dist-url=https://electronjs.org/headers --arch=x64
+          if ($LASTEXITCODE -ne 0) { throw 'Native print adapter build failed' }
+          Pop-Location
+      - name: Apply overlay to the verified published 1.0.11
+        working-directory: electimes-112
+        shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 3 -o base.exe https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.11/ElectimesOffice-Setup-1.0.11-x64.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Base download failed' }
+          if ((Get-FileHash base.exe -Algorithm SHA256).Hash.ToLower() -ne 'd333bff0e1de01e333698cb74199064feece7f730e6a76d5b9f26a6e42222722') { throw 'Base release checksum mismatch' }
+          & 'C:\Program Files\7-Zip\7z.exe' x base.exe -obase-installer -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Base extraction failed' }
+          node build.cjs base-installer stage
+          if ($LASTEXITCODE -ne 0) { throw 'Overlay preservation failed' }
+      - name: Verify native print dialog, cancellation, restored DPI and PDF page size
+        timeout-minutes: 8
+        working-directory: electimes-112
+        shell: pwsh
+        run: |
+          Start-Service Spooler
+          Get-Printer | Format-Table Name,DriverName
+          node print-native.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Native printing verification failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-112-native-validation
+          path: |
+            electimes-112/*-windows.json
+            electimes-112/*-windows.png
+            electimes-112/stage/BUILD-VERIFICATION.json
+            electimes-112/native/build/Release/print_compat.node
