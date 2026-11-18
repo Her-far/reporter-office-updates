@@ -1,24 +1,25 @@
 {
   "product": "electimes-office",
   "platform": "win32-x64",
-  "version": "1.0.10",
-  "build": 110,
+  "version": "1.0.11",
+  "build": 111,
   "minBuild": 103,
-  "maxBuild": 109,
+  "maxBuild": 110,
   "notes": [
-    "홈 화면에서도 설정한 패널 위치를 적용합니다.",
-    "확대 화면에 패널로 돌아가기 버튼을 표시하고 Esc로 복원합니다.",
-    "홈 화면의 확대 패널이 문서 탭과 창 조작 버튼을 가리지 않도록 수정했습니다.",
-    "기존 패널 너비와 작성 중인 메모를 유지합니다."
+    "HWP 표 안에서 긴 글을 붙여넣은 뒤 아래 문단과 겹치는 문제를 수정했습니다.",
+    "잘라내기·범위 삭제 후 남은 문단의 위치를 다시 계산합니다.",
+    "중첩 표의 서식 있는 붙여넣기에도 같은 수정을 적용했습니다.",
+    "빈 줄 삭제 시 본문 줄 간격을 유지하고 실행 취소 시 원래 서식을 복원합니다.",
+    "1.0.10 패널 수정을 유지합니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.10/ElectimesOffice-Setup-1.0.10-x64.exe",
-    "size": 300160284,
-    "sha256": "91a7b5b39254c8345588cfefb28d386a96c882bdeec352edd8aaf6a0040e066e"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.11/ElectimesOffice-Setup-1.0.11-x64.exe",
+    "size": 300167741,
+    "sha256": "d333bff0e1de01e333698cb74199064feece7f730e6a76d5b9f26a6e42222722"
   },
   "fullInstaller": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.10/ElectimesOffice-Setup-1.0.10-x64.exe",
-    "size": 300160284,
-    "sha256": "91a7b5b39254c8345588cfefb28d386a96c882bdeec352edd8aaf6a0040e066e"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.11/ElectimesOffice-Setup-1.0.11-x64.exe",
+    "size": 300167741,
+    "sha256": "d333bff0e1de01e333698cb74199064feece7f730e6a76d5b9f26a6e42222722"
   }
 }
