@@ -112,7 +112,8 @@ function aiWebView(){const w=state.aiWeb,n=el('div','mail-shell ai-shell'),bar=e
  const link=el('form','ai-link'),input=el('input');input.type='url';input.placeholder='이메일로 받은 로그인 링크 붙여넣기';input.setAttribute('aria-label','로그인 링크');link.append(input,button('이동',()=>link.requestSubmit()));link.onsubmit=e=>{e.preventDefault();if(input.value.trim())void action('ai-link',input.value.trim());};
  extra.append(button('로그인 창 열기',()=>action('ai-login'),'primary ai-login-open'),button('처음 화면',()=>action('ai-home')),button('Edge 창으로 열기',()=>action('ai-browser')),button('기본 브라우저에서 열기',()=>action('ai-external')),link,zoom,button(label+' 로그아웃',()=>action('ai-reset'),'danger'));
  extra.append(el('p','sub','로그인은 별도 창에서 하고, 끝나면 창이 닫히며 패널에 반영됩니다. 그래도 안 되면 Edge 창으로 여세요(평소 브라우저의 로그인 사용).'));more.append(extra);
- bar.append(tabs,back,reload,expand,more);n.append(bar);
+ const browser=button('브라우저 창',()=>action('ai-browser'));browser.title=label+' 로그인과 대화를 같은 브라우저 창에서 계속';
+ bar.append(tabs,back,reload,expand,browser,more);n.append(bar);
  if(!w.enabled){n.append(el('p','empty','업무 연동 설정에서 웹 AI를 켜 주세요.'));return n;}
  if(!state.prefs.aiWebNoticeSeen){const box=el('div','ai-notice');box.append(el('p','','처음 한 번 각 서비스에 로그인하면 이 PC에서 유지됩니다. 엠바고·미공개 원고, 취재원과 개인정보는 입력하지 마세요. 무료 계정의 대화는 서비스 회사의 AI 학습에 쓰일 수 있습니다.'),button('확인',()=>setting({aiWebNoticeSeen:true}),'primary'));n.append(box);}
  if(w.error){const box=el('div','section error');box.append(el('span','',errors[w.error]||'AI 화면을 다시 여세요.'),button('다시 시도',()=>action('ai-reload')));n.append(box);}

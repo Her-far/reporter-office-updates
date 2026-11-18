@@ -30,6 +30,14 @@ if (pkg.name !== 'electimes-office' || pkg.version !== FROM.version) throw Error
 for (const [name, a, b] of [
   ['out/main/reporter-updater.cjs', 'let version = { version: "1.0.12", build: 112 }', 'let version = { version: "1.0.13", build: 113 }'],
 ]) { const s = exact(asar.content(archive, name).toString(), a, b); new vm.Script(s); replacements.set(name, Buffer.from(s)); }
+if (label) {
+  const mainPath = 'out/main/index.js';
+  const source = asar.content(archive, mainPath).toString();
+  const main = exact(source, 'app.getPath("appData"), "Electimes Office");',
+    'app.getPath("appData"), "Electimes Office Wide AI Test");');
+  new vm.Script(main);
+  replacements.set(mainPath, Buffer.from(main));
+}
 // Work panel: each replaced file must be exactly the shipped 1.0.12 version first.
 const lf = t => t.replace(/\r\n/g, '\n');
 const read = (...p) => lf(fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8'));
