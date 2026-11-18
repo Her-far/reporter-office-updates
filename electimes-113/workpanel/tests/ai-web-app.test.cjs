@@ -27,6 +27,7 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
           const u = new URL(req.url);
           if (u.pathname === '/favicon.ico') return new Response('', { status: 404 });
           return page(u.host + u.pathname, `
+            <a id=chat href="https://chatgpt.com/c/1">chat</a>
             <a id=login href="https://auth.openai.com/log-in">login</a>
             <a id=google href="https://accounts.google.com/v3/signin/identifier">google</a>
             <a id=cite target=_blank href="https://example.com/source">source</a>
@@ -38,7 +39,7 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     });
 
     const root = await app.firstWindow(); await root.waitForSelector('.wp-toolbar', { timeout: 30000 });
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1400, 900)); await root.waitForTimeout(300);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow()).setContentSize(1400, 900)); await root.waitForTimeout(300);
     ok('Web AI tab sits next to the document AI tab', await root.locator('.wp-toolbar [data-menu]').evaluateAll(ns => ns.map(n => n.dataset.menu).join()) === 'ai,aiweb,mail,calendar,notes');
     await root.locator('[data-menu=aiweb]').click();
     const view = url => app.evaluate(({ webContents }, url) => !!webContents.getAllWebContents().find(w => w.getURL().startsWith(url)), url);
@@ -49,9 +50,9 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     ok('First-use notice warns about unpublished copy', (await panel.locator('.ai-notice').innerText()).includes('미공개 원고'));
 
     const info = id => app.evaluate(async ({ webContents, session, BrowserWindow }, id) => {
-      const w = BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-' + id));
+      const w = BrowserWindow.getAllWindows().flatMap(w => w.contentView.children).map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-' + id));
       if (!w) return null; const p = w.getLastWebPreferences();
-      const view = BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.webContents === w);
+      const view = BrowserWindow.getAllWindows().flatMap(w => w.contentView.children).find(v => v.webContents === w);
       return { url: w.getURL(), node: p.nodeIntegration, isolation: p.contextIsolation, sandbox: p.sandbox, webSecurity: p.webSecurity, preload: p.preload || null,
         visible: !!view?.getVisible(), bounds: view?.getBounds(), ua: await w.executeJavaScript('navigator.userAgent'), title: w.getTitle() };
     }, id);
@@ -59,7 +60,7 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     let c = await info('chatgpt');
     ok('Remote page is sandboxed, isolated and without preload', !c.node && c.isolation && c.sandbox && c.webSecurity && !c.preload);
     ok('Page sees a plain Chrome user agent', /Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/.test(c.ua) && !/Electron|electimes/i.test(c.ua));
-    const win = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].getContentBounds());
+    const win = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow()).getContentBounds());
     ok('Page is placed inside the side panel', c.bounds.width >= 250 && c.bounds.height > 300 && c.bounds.x > win.width / 3 && c.bounds.x + c.bounds.width <= win.width + 1);
 
     await panel.getByRole('button', { name: '확인', exact: true }).click();
@@ -67,7 +68,7 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     ok('Notice stays dismissed', (await panel.evaluate(() => window.workPanel.action('state'))).state.prefs.aiWebNoticeSeen === true);
 
     const run = (id, js) => app.evaluate(({ webContents, session, BrowserWindow }, [id, js]) => {
-      const w = BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-' + id));
+      const w = BrowserWindow.getAllWindows().flatMap(w => w.contentView.children).map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-' + id));
       return w.executeJavaScript(js, true);
     }, [id, js]);
 
@@ -75,12 +76,28 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     await wait(async () => (await info('chatgpt')).title === 'copied', 'copy');
     ok("The page's own copy button reaches the clipboard", await app.evaluate(({ clipboard }) => clipboard.readText()) === '웹 AI 답변 복사');
 
+    // Account sign-in: a separate full-size window on the service's own session.
+    const loginWindow = () => app.evaluate(({ BrowserWindow, session }) => { const w = BrowserWindow.getAllWindows().find(w => w.getTitle() === 'ChatGPT 로그인'); if (!w) return null; const p = w.webContents.getLastWebPreferences(); return { url: w.webContents.getURL(), same: w.webContents.session === session.fromPartition('persist:electimes-workpanel-ai-chatgpt'), sandbox: p.sandbox, isolation: p.contextIsolation, node: p.nodeIntegration, preload: p.preload || null, ua: w.webContents.getUserAgent(), size: w.getSize() }; });
+    const panelUrl = (await info('chatgpt')).url;
     await run('chatgpt', "document.getElementById('login').click()");
-    await wait(async () => (await info('chatgpt')).url.startsWith('https://auth.openai.com/'), 'sign-in page');
-    ok('Sign-in page opens inside the panel', true);
+    let lw = await wait(async () => { const w = await loginWindow(); return w?.url.startsWith('https://auth.openai.com/') && w; }, 'sign-in window');
+    ok('Sign-in opens in a separate window, not in the panel', (await info('chatgpt')).url === panelUrl && lw.size[0] >= 900);
+    ok('Sign-in window shares only the service session and stays sandboxed', lw.same && lw.sandbox && lw.isolation && !lw.node && !lw.preload && !/Electron|electimes/i.test(lw.ua));
     await run('chatgpt', "document.getElementById('google').click()");
-    await wait(async () => (await info('chatgpt')).url.startsWith('https://accounts.google.com/'), 'Google sign-in');
-    ok('Google sign-in opens inside the same isolated session', true);
+    lw = await wait(async () => { const w = await loginWindow(); return w?.url.startsWith('https://accounts.google.com/') && w; }, 'Google sign-in in the same window');
+    ok('Google sign-in reuses the one sign-in window', (await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter(w => w.getTitle() === 'ChatGPT 로그인').length)) === 1);
+    // Finishing sign-in lands on the service: the window closes and the panel shows that page.
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getTitle() === 'ChatGPT 로그인').loadURL('https://chatgpt.com/?signed=1').catch(() => {}));
+    await wait(async () => !(await loginWindow()) && (await info('chatgpt')).url === 'https://chatgpt.com/?signed=1', 'sign-in completes');
+    ok('Finished sign-in closes the window and updates the panel', true);
+    await panel.locator('.mail-more summary').click();
+    await panel.getByRole('button', { name: '로그인 창 열기' }).click();
+    await wait(async () => (await loginWindow())?.url.startsWith('https://chatgpt.com/auth/login'), 'menu sign-in');
+    ok('Menu opens the service sign-in page', true);
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => w.getTitle() === 'ChatGPT 로그인').close());
+    await panel.locator('.mail-more summary').click();
+    await run('chatgpt', "document.getElementById('chat').click()");
+    await wait(async () => (await info('chatgpt')).url === 'https://chatgpt.com/c/1', 'conversation');
     const before = (await info('chatgpt')).url;
     await run('chatgpt', "document.getElementById('search').click()");
     await wait(() => app.evaluate(() => globalThis.__external.includes('https://www.google.com/search?q=x')), 'search outside');
@@ -96,8 +113,10 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     ok('Sign-in popup shares only the service session', popup.same && popup.sandbox);
     await app.evaluate(({ BrowserWindow }) => { for (const w of BrowserWindow.getAllWindows()) if (w.webContents.getURL().startsWith('https://accounts.google.com/o/oauth2')) w.close(); });
     await panel.getByRole('button', { name: '뒤로' }).click();
-    await wait(async () => (await info('chatgpt')).url.startsWith('https://auth.openai.com/'), 'back');
+    await wait(async () => (await info('chatgpt')).url === 'https://chatgpt.com/', 'back');
     ok('Back button returns to the previous page', true);
+    await run('chatgpt', "document.getElementById('chat').click()");
+    await wait(async () => (await info('chatgpt')).url === 'https://chatgpt.com/c/1', 'conversation again');
 
     await app.evaluate(({ session }) => session.fromPartition('persist:electimes-workpanel-ai-chatgpt').cookies.set({ url: 'https://chatgpt.com/', name: 'signed_in', value: '1', expirationDate: Date.now() / 1000 + 3600 }));
     await panel.locator('.ai-services button', { hasText: 'Claude' }).click();
@@ -109,7 +128,7 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     ok('Gemini opens its official address', (await info('gemini')).url === 'https://gemini.google.com/app');
     await panel.locator('.ai-services button', { hasText: 'ChatGPT' }).click();
     await wait(async () => (await info('chatgpt'))?.visible, 'ChatGPT again');
-    ok('Returning keeps the conversation page', (await info('chatgpt')).url.startsWith('https://auth.openai.com/'));
+    ok('Returning keeps the conversation page', (await info('chatgpt')).url === 'https://chatgpt.com/c/1');
 
     await panel.locator('.mail-more summary').click();
     await panel.getByLabel('로그인 링크').fill('https://claude.ai/magic-link#token');
@@ -127,7 +146,7 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     ok('After logout the service starts again', true);
 
     await panel.locator('.mail-more summary').click();
-    const panelY = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.webContents?.getURL().includes('work-panel/index.html')).getBounds().y);
+    const panelY = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().flatMap(w => w.contentView.children).find(v => v.webContents?.getURL().includes('work-panel/index.html')).getBounds().y);
     const menuBottom = await panel.locator('.ai-extra').evaluate(n => n.getBoundingClientRect().bottom);
     await wait(async () => (await info('chatgpt')).bounds.y >= panelY + menuBottom - 1, 'page moves below the open menu', 5000).catch(async e => { fs.writeFileSync(path.join(out, 'panel-menu-fail.png'), await panel.screenshot()); console.log('DEBUG menu', panelY, menuBottom, JSON.stringify((await info('chatgpt')).bounds), await panel.locator('.ai-toolbar').evaluate(n => n.getBoundingClientRect().height), await panel.locator('.mail-more').evaluate(n => n.getBoundingClientRect().height)); throw e; });
     fs.writeFileSync(path.join(out, 'panel-menu.png'), await panel.screenshot());
@@ -154,7 +173,7 @@ const ok = (name, value) => { assert(value, name); results.push(name); console.l
     await root.locator('[data-menu=aiweb]').click();
     await wait(async () => (await info('chatgpt'))?.visible, 'final');
     fs.writeFileSync(path.join(out, 'panel.png'), await panel.screenshot());
-    const shot = await app.evaluate(async ({ webContents, session, BrowserWindow }) => { const w = BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-chatgpt')); return (await w.capturePage()).toPNG().toString('base64'); });
+    const shot = await app.evaluate(async ({ webContents, session, BrowserWindow }) => { const w = BrowserWindow.getAllWindows().flatMap(w => w.contentView.children).map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-chatgpt')); return (await w.capturePage()).toPNG().toString('base64'); });
     fs.writeFileSync(path.join(out, 'page.png'), Buffer.from(shot, 'base64'));
     fs.writeFileSync(path.join(out, 'home.png'), await root.screenshot());
     fs.writeFileSync(path.join(out, 'results.json'), JSON.stringify({ environment: 'Linux Electron 43.7.6 headless, built 1.0.13 payload, stand-in service pages', results, live: 'unverified: real sign-in needs Windows and accounts' }, null, 2));

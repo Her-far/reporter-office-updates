@@ -6,9 +6,9 @@
 const path = require('node:path');
 
 const SERVICES = Object.freeze({
-  chatgpt: Object.freeze({ id: 'chatgpt', label: 'ChatGPT', home: 'https://chatgpt.com/', hosts: ['chatgpt.com', 'openai.com', 'oaistatic.com', 'oaiusercontent.com'] }),
-  claude: Object.freeze({ id: 'claude', label: 'Claude', home: 'https://claude.ai/new', hosts: ['claude.ai', 'claude.com', 'anthropic.com', 'claudeusercontent.com'] }),
-  gemini: Object.freeze({ id: 'gemini', label: 'Gemini', home: 'https://gemini.google.com/app', hosts: ['gemini.google.com'] }),
+  chatgpt: Object.freeze({ id: 'chatgpt', label: 'ChatGPT', home: 'https://chatgpt.com/', login: 'https://chatgpt.com/auth/login', main: 'chatgpt.com', hosts: ['chatgpt.com', 'openai.com', 'oaistatic.com', 'oaiusercontent.com'] }),
+  claude: Object.freeze({ id: 'claude', label: 'Claude', home: 'https://claude.ai/new', login: 'https://claude.ai/login', main: 'claude.ai', hosts: ['claude.ai', 'claude.com', 'anthropic.com', 'claudeusercontent.com'] }),
+  gemini: Object.freeze({ id: 'gemini', label: 'Gemini', home: 'https://gemini.google.com/app', login: 'https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fgemini.google.com%2Fapp&hl=ko', main: 'gemini.google.com', hosts: ['gemini.google.com'] }),
 });
 const SERVICE_IDS = Object.keys(SERVICES);
 
@@ -37,6 +37,22 @@ function classify(url) {
 function serviceOf(url) {
   const u = httpsUrl(url); if (!u) return null;
   return SERVICE_IDS.find(id => hostIn(u.hostname, SERVICES[id].hosts)) || null;
+}
+
+// Account sign-in pages. Signing in inside the narrow panel view did not complete
+// for ChatGPT and Gemini, while Claude's Google sign-in, which the site opens as a
+// separate window, did. These pages therefore always open in a separate sign-in
+// window that shares only the service's session (as the mail login already does).
+const SIGN_IN_HOSTS = AUTH_HOSTS.filter(h => h !== 'challenges.cloudflare.com').concat(['auth.openai.com', 'auth0.openai.com']);
+function isSignIn(url) {
+  const u = httpsUrl(url); if (!u) return false;
+  return hostIn(u.hostname, SIGN_IN_HOSTS) || (u.hostname === 'chatgpt.com' && /^\/auth\/login/.test(u.pathname));
+}
+
+/** The sign-in window has finished when it is back on the service itself. */
+function signedIn(id, url) {
+  const u = httpsUrl(url), s = SERVICES[id]; if (!u || !s) return false;
+  return u.hostname === s.main && !/^\/(auth|login|api\/auth|magic-link|sso)(\/|$)/.test(u.pathname);
 }
 
 /** A top-level navigation the user or page starts inside the panel. */
@@ -78,4 +94,4 @@ function appWindowArgs(url, bounds) {
   return args;
 }
 
-module.exports = { SERVICES, SERVICE_IDS, AUTH_HOSTS, partitionOf, classify, serviceOf, inPanel, redirectAllowed, browserUserAgent, permissionAllowed, browserCandidates, appWindowArgs };
+module.exports = { SERVICES, SERVICE_IDS, AUTH_HOSTS, partitionOf, classify, serviceOf, isSignIn, signedIn, inPanel, redirectAllowed, browserUserAgent, permissionAllowed, browserCandidates, appWindowArgs };

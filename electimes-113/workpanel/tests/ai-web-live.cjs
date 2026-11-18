@@ -15,12 +15,12 @@ const harness = prepare(out);
   try {
     await app.evaluate(({ shell }) => { globalThis.__external = []; shell.openExternal = async url => { globalThis.__external.push(url); }; });
     const root = await app.firstWindow(); await root.waitForSelector('.wp-toolbar', { timeout: 30000 });
-    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1400, 900));
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find(w => !w.getParentWindow()).setContentSize(1400, 900));
     await root.locator('[data-menu=aiweb]').click();
     const panel = await wait(async () => app.context().pages().find(p => p.url().includes('work-panel/index.html')), 'panel');
     await panel.locator('.ai-services').waitFor();
     const view = id => app.evaluate(async ({ BrowserWindow, session }, id) => {
-      const w = BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-' + id));
+      const w = BrowserWindow.getAllWindows().flatMap(w => w.contentView.children).map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-' + id));
       if (!w) return null;
       const text = await w.executeJavaScript('document.body ? document.body.innerText.slice(0, 600) : ""').catch(() => '');
       return { url: w.getURL(), title: w.getTitle(), text: text.replace(/\s+/g, ' '), png: (await w.capturePage()).toPNG().toString('base64') };
@@ -36,7 +36,7 @@ const harness = prepare(out);
     // Google's own sign-in page in Gemini's session: does it offer the normal flow?
     await panel.evaluate(() => window.workPanel.action('ai-service', 'gemini'));
     await app.evaluate(async ({ BrowserWindow, session }) => {
-      const w = BrowserWindow.getAllWindows()[0].contentView.children.map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-gemini'));
+      const w = BrowserWindow.getAllWindows().flatMap(w => w.contentView.children).map(v => v.webContents).find(w => w && w.session === session.fromPartition('persist:electimes-workpanel-ai-gemini'));
       await w.loadURL('https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fgemini.google.com%2Fapp&hl=ko').catch(() => {});
     });
     await new Promise(r => setTimeout(r, 8000));

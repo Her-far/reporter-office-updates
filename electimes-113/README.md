@@ -28,9 +28,13 @@ document AI (subscription or API key) is unchanged.
 - The session sends Chrome's own reduced user agent (no `Electron/` or app
   token). With the default Electron agent, Google's sign-in served its reduced
   "WebLite" flow in a probe; with this agent it served the normal flow.
-- The service pages and their sign-in pages (Google, Apple, Microsoft accounts,
-  Cloudflare check) stay in the panel; sign-in popups share only that service's
-  session. Every other link, including answer citations, opens in the default
+- Account sign-in pages (Google, Apple, Microsoft accounts, auth.openai.com,
+  chatgpt.com/auth/login) never load in the panel view. They open in a separate
+  full-size sign-in window on the same service session, which closes itself once
+  it is back on the service; the panel then shows that page. In the 1.0.13-test.2
+  Windows trial, ChatGPT and Gemini sign-in inside the panel did not complete,
+  while Claude's Google sign-in, which the site opens as its own window, did.
+  Pop-ups the sites open themselves also share only that service's session. Every other link, including answer citations, opens in the default
   browser. Only HTTPS redirects are followed. Local files are never opened.
 - The views join the shell's navigation-guard set (`isMailContents`); without
   that the global guard blocks every sign-in redirect.
@@ -54,8 +58,8 @@ ELECTRON_BINARY=<electron 43.7.6> WORKPANEL_PAYLOAD=<stage> xvfb-run node workpa
 ```
 
 `ai-web-app.test.cjs` drives the built 1.0.13 application with stand-in pages on
-the services' real HTTPS origins (29 checks: isolation, user agent, placement,
-copy button, in-panel sign-in, popups, outside links, per-service sessions,
+the services' real HTTPS origins (32 checks: isolation, user agent, placement,
+copy button, separate sign-in window and its completion, popups, outside links, per-service sessions,
 pasted link, logout, menu overlap, tab hiding). Live sign-in to the three real
 services is not covered and must be checked on Windows with real accounts.
 

@@ -20,3 +20,4 @@
 .ai-toolbar:has(.mail-more[open]){height:auto;min-height:252px}.ai-extra>button{padding:5px 8px}.ai-extra .sub{flex-basis:100%;margin:2px 0 0;font-size:11px}.ai-link{display:flex;gap:4px;flex-basis:100%}.ai-link input{flex:1;min-width:0;height:30px;padding:4px 7px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text)}.ai-link button{padding:4px 8px}
 .ai-notice{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;border-bottom:1px solid var(--border);background:var(--accent-soft);font-size:12px;line-height:1.5;flex-shrink:0}.ai-notice p{margin:0;flex:1}.ai-notice .primary{width:auto;margin:0;flex:none;padding:4px 10px}
 .ai-shell>.error{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0}.ai-footer{justify-content:flex-start;color:var(--sub)}
+.ai-extra .ai-login-open{width:auto;margin:0}

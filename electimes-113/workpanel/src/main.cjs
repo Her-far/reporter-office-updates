@@ -18,7 +18,7 @@ function register(deps){
   const mailDiagnostics=require('./mail-diagnostics.cjs').createDiagnostics();
   const popups=new Set(),downloads=new Map(),hostIds=new Set(),escapeHosts=new WeakSet();let revision=0,loginWindow=null,hostBlocked=false;
   // Web AI: one isolated view and persistent session per service, created on first use.
-  const aiViews=new Map(),aiSessions=new Map(),aiStatus=new Map();let panelBounds=null;
+  const aiViews=new Map(),aiSessions=new Map(),aiStatus=new Map(),aiLogins=new Map();let panelBounds=null;
   let range={start:new Date(Date.now()-40*86400000).toISOString(),end:new Date(Date.now()+100*86400000).toISOString()};
   const vault=new Vault(path.join(app.getPath('userData'),'work-panel','secure'),safeStorage);
   let deploymentClient=require('./google-deployment.cjs');
@@ -71,16 +71,29 @@ function register(deps){
   function openOutside(url){const u=httpsUrl(url);if(u)void shell.openExternal(u.href).catch(()=>{});}
   function popupOptions(ses){return {title:'로그인',width:520,height:720,autoHideMenuBar:true,webPreferences:{session:ses,nodeIntegration:false,nodeIntegrationInWorker:false,contextIsolation:true,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,backgroundThrottling:true,preload:undefined}};}
   // Service and sign-in pages stay in the isolated session; every other link opens in the default browser.
-  function secureAi(wc){mailContents.add(wc);aiContents.add(wc);wc.setUserAgent(wc.session.getUserAgent());
+  // In the panel view itself, account sign-in pages open in a separate sign-in window instead.
+  function secureAi(wc,id,inPanel){mailContents.add(wc);aiContents.add(wc);wc.setUserAgent(wc.session.getUserAgent());
+    const toLogin=(e,url)=>{if(!inPanel||!aiWeb.isSignIn(url))return false;e.preventDefault();openAiLogin(id,url);return true;};
     wc.setWindowOpenHandler(({url})=>{if(url==='about:blank'||aiWeb.classify(url))return {action:'allow',overrideBrowserWindowOptions:popupOptions(wc.session)};openOutside(url);return {action:'deny'};});
-    wc.on('will-navigate',(e,url)=>{if(aiWeb.inPanel(url))return;e.preventDefault();openOutside(url);const blank=!wc.getURL()||wc.getURL()==='about:blank',win=BrowserWindow.fromWebContents(wc);if(blank&&win&&popups.has(win))win.close();});
-    wc.on('will-redirect',(e,url)=>{if(!aiWeb.redirectAllowed(url))e.preventDefault();});
+    wc.on('will-navigate',(e,url)=>{if(toLogin(e,url)||aiWeb.inPanel(url))return;e.preventDefault();openOutside(url);const blank=!wc.getURL()||wc.getURL()==='about:blank',win=BrowserWindow.fromWebContents(wc);if(blank&&win&&popups.has(win))win.close();});
+    wc.on('will-redirect',(e,url)=>{if(toLogin(e,url))return;if(!aiWeb.redirectAllowed(url))e.preventDefault();});
     wc.on('will-attach-webview',e=>e.preventDefault());
-    wc.on('did-create-window',win=>{popups.add(win);secureAi(win.webContents);win.on('closed',()=>popups.delete(win));});
+    wc.on('did-create-window',win=>{popups.add(win);secureAi(win.webContents,id,false);win.on('closed',()=>popups.delete(win));});
+  }
+  // A full-size official sign-in page that shares only this service's session. It closes
+  // itself once the page is back on the service, and the panel then shows the signed-in page.
+  function openAiLogin(id,url){const service=aiWeb.SERVICES[id];let win=aiLogins.get(id);
+    if(win&&!win.isDestroyed()){win.show();win.focus();if(url)win.loadURL(url).catch(()=>{});return;}
+    win=new BrowserWindow({parent:deps.window(),title:service.label+' 로그인',width:1000,height:760,minWidth:520,minHeight:600,autoHideMenuBar:true,webPreferences:{session:aiSession(id),nodeIntegration:false,nodeIntegrationInWorker:false,contextIsolation:true,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,backgroundThrottling:true}});
+    aiLogins.set(id,win);popups.add(win);secureAi(win.webContents,id,false);win.on('page-title-updated',e=>e.preventDefault());let landed=null;
+    const done=(_e,u)=>{if(!landed&&aiWeb.signedIn(id,u)){landed=u;win.close();}};
+    win.webContents.on('did-navigate',done);win.webContents.on('did-navigate-in-page',done);
+    win.on('closed',()=>{popups.delete(win);if(aiLogins.get(id)===win)aiLogins.delete(id);if(closing)return;const v=aiViews.get(id);if(v&&!v.webContents.isDestroyed())v.webContents.loadURL(landed||service.home).catch(()=>{});});
+    win.loadURL(url||service.login).catch(()=>{});
   }
   function ensureAi(id){let v=aiViews.get(id);if(v&&!v.webContents.isDestroyed())return v;
     v=new WebContentsView({webPreferences:{session:aiSession(id),nodeIntegration:false,nodeIntegrationInWorker:false,contextIsolation:true,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,backgroundThrottling:true,spellcheck:false}});
-    aiViews.set(id,v);const wc=v.webContents,st=aiStatusOf(id);watchEscape(wc);secureAi(wc);wc.setZoomFactor(prefs.aiWebZoom);
+    aiViews.set(id,v);const wc=v.webContents,st=aiStatusOf(id);watchEscape(wc);secureAi(wc,id,true);wc.setZoomFactor(prefs.aiWebZoom);
     wc.on('did-finish-load',()=>wc.setZoomFactor(prefs.aiWebZoom));
     wc.on('did-start-loading',()=>{st.error='';st.ready=false;emit();});
     wc.on('did-stop-loading',()=>{st.ready=!st.error;emit();});
@@ -212,6 +225,7 @@ function register(deps){
       else if(a==='ai-back'){const v=aiViews.get(prefs.aiWebService);if(v?.webContents.navigationHistory.canGoBack())v.webContents.navigationHistory.goBack();}
       else if(a==='ai-reload'){const v=aiViews.get(prefs.aiWebService);if(v&&!v.webContents.isDestroyed())v.webContents.reload();else layout();}
       else if(a==='ai-link'){if(!prefs.aiWebEnabled)throw Error('ai-disabled');const u=httpsUrl(String(x||'').trim()),id=u&&aiWeb.serviceOf(u.href);if(!id)throw Error('ai-link');prefs=settingsOf({aiWebService:id},prefs);await persist();layout();const v=ensureAi(id);await v.webContents.loadURL(u.href).catch(()=>{});}
+      else if(a==='ai-login'){if(!prefs.aiWebEnabled)throw Error('ai-disabled');openAiLogin(prefs.aiWebService);}
       else if(a==='ai-browser')await openAiBrowser(prefs.aiWebService);
       else if(a==='ai-external')await external(aiWeb.SERVICES[prefs.aiWebService].home);
       else if(a==='ai-reset')await resetAi(prefs.aiWebService);

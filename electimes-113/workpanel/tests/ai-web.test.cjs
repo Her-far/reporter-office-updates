@@ -74,3 +74,16 @@ test('web AI preferences: menu, defaults and validation', () => {
   const old = settingsOf({ menu: 'mail', mailDisplay: 'web', width: 520 });
   assert.equal(old.menu, 'mail'); assert.equal(old.width, 520); assert.equal(old.aiWebService, 'chatgpt');
 });
+
+test('account sign-in pages go to a separate window and finish back on the service', () => {
+  for (const url of ['https://accounts.google.com/v3/signin/identifier', 'https://auth.openai.com/log-in', 'https://chatgpt.com/auth/login?next=/', 'https://appleid.apple.com/auth', 'https://login.live.com/'])
+    assert.ok(ai.isSignIn(url), url);
+  for (const url of ['https://chatgpt.com/', 'https://claude.ai/login', 'https://gemini.google.com/app', 'https://challenges.cloudflare.com/x', 'http://accounts.google.com/'])
+    assert.ok(!ai.isSignIn(url), url);
+  assert.ok(ai.signedIn('chatgpt', 'https://chatgpt.com/'));
+  assert.ok(ai.signedIn('gemini', 'https://gemini.google.com/app'));
+  assert.ok(ai.signedIn('claude', 'https://claude.ai/new'));
+  for (const [id, url] of [['chatgpt', 'https://chatgpt.com/auth/login'], ['chatgpt', 'https://auth.openai.com/'], ['claude', 'https://claude.ai/login'], ['claude', 'https://claude.ai/magic-link'], ['gemini', 'https://accounts.google.com/'], ['gemini', 'https://chatgpt.com/']])
+    assert.ok(!ai.signedIn(id, url), id + ' ' + url);
+  for (const id of ai.SERVICE_IDS) assert.ok(ai.inPanel(ai.SERVICES[id].login) && !ai.signedIn(id, ai.SERVICES[id].login));
+});
