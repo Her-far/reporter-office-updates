@@ -18,7 +18,12 @@ const fixture = '<!doctype html><html lang="ko"><meta charset="utf-8"><title>Wor
 async function interceptWorks() { await app.context().route(WORKS_URL + '**', route => route.fulfill({ contentType: 'text/html', body: fixture })); }
 async function remotePage() { return until(() => app.context().pages().find(p => p.url().startsWith(WORKS_URL)), 'Works remote'); }
 async function hostPage() { return until(() => app.context().pages().find(p => p.url().endsWith('/works-tab/host.html')), 'Works host'); }
-async function closeApp() { if (app) { const old = app; app = null; await old.evaluate(({ app }) => app.exit(0)); await old.close().catch(() => {}); } }
+async function closeApp() {
+  if (!app) return;
+  const old = app; app = null;
+  // Quit on a subsequent tick so the debugger RPC can return before the process exits.
+  await require('../electimes-110/close-app.cjs')(old);
+}
 async function geometry() {
   return app.evaluate(({ BrowserWindow }) => {
     const win = BrowserWindow.getAllWindows()[0];
