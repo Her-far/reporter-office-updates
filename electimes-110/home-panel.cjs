@@ -15,6 +15,9 @@ async function choose(page,menu){await page.locator('.wp-toolbar [data-menu='+me
 async function positioned(page,side){return page.evaluate(side=>{const d=document.querySelector('.wp-dock');if(!d||d.classList.contains('wp-expanded'))return false;const r=d.getBoundingClientRect();return document.documentElement.dataset.aiPanelSide===side&&(side==='right'?Math.abs(r.right-innerWidth)<3:r.left<3);},side);}
 async function expanded(page,expected){await until(()=>page.locator('.wp-dock').evaluate((d,expected)=>d.classList.contains('wp-expanded')===expected,expected),'expanded='+expected);}
 async function width(page){return page.locator('.wp-dock').evaluate(d=>d.getBoundingClientRect().width);}
+// CDP Input.dispatchKeyEvent bypasses Electron's before-input-event. Send through
+// the native WebContents keyboard path used by physical Windows keyboard input.
+async function escape(page){await app.evaluate(({webContents},url)=>{const wc=webContents.getAllWebContents().find(w=>w.getURL()===url);if(!wc)throw Error('Missing keyboard target');wc.focus();wc.sendInputEvent({type:'keyDown',keyCode:'Escape'});wc.sendInputEvent({type:'keyUp',keyCode:'Escape'});},page.url());}
 async function getPanel(){panel=await until(()=>app.context().pages().find(p=>p.url().includes('/work-panel/index.html')),'work panel contents');await panel.waitForFunction(()=>window.workPanel);return panel;}
 async function assertBack(page,homeMode){
  const box=await page.locator('.wp-restore').evaluate(b=>{const r=b.getBoundingClientRect(),d=b.closest('.wp-dock').getBoundingClientRect();return {visible:!b.hidden,x:r.x,y:r.y,right:r.right,bottom:r.bottom,dockTop:d.top,dockBottom:d.bottom,tabBottom:document.querySelector('.tab-bar')?.getBoundingClientRect().bottom||0,width:innerWidth,height:innerHeight,hit:document.elementFromPoint(r.x+r.width/2,r.y+r.height/2)===b};});
@@ -34,7 +37,7 @@ async function assertBack(page,homeMode){
   await home.locator('.wp-expand').click();await expanded(home,true);const bounds=await assertBack(home,true);
   await home.locator('.wp-restore').click();await expanded(home,false);await until(()=>positioned(home,side),'restored home '+side);
   assert.equal(await width(home),originalWidth);assert.equal(await body.inputValue(),draft);
-  await home.locator('.wp-expand').click();await expanded(home,true);await body.click();await panel.keyboard.press('Escape');await expanded(home,false);
+  await home.locator('.wp-expand').click();await expanded(home,true);await body.click();await escape(panel);await expanded(home,false);
   assert.equal(await width(home),originalWidth);assert.equal(await body.inputValue(),draft);
   report.homeSides.push({side,buttonRestore:true,noteFocusedEscape:true,captionClearance:bounds.y-bounds.tabBottom});
  }
@@ -47,16 +50,16 @@ async function assertBack(page,homeMode){
  await app.context().route('https://mail.worksmobile.com/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Synthetic webmail</title><input id="fixture" aria-label="Synthetic mail input">'}));
  await panel.evaluate(()=>workPanel.action('settings',{mailDisplay:'web',mailEnabled:true}));await choose(home,'mail');
  const remote=await until(()=>app.context().pages().find(p=>p.url().startsWith('https://mail.worksmobile.com/')),'synthetic webmail');await remote.locator('#fixture').waitFor();
- await home.locator('.wp-expand').click();await expanded(home,true);await remote.locator('#fixture').click();await remote.keyboard.press('Escape');await expanded(home,false);report.webmailEscape=true;
+ await home.locator('.wp-expand').click();await expanded(home,true);await remote.locator('#fixture').click();await escape(remote);await expanded(home,false);report.webmailEscape=true;
  await home.locator('.wp-expand').click();await expanded(home,true);await panel.getByRole('button',{name:/^다운로드 \d+개$/}).click();await panel.locator('#detail[open]').waitFor();
- await panel.keyboard.press('Escape');await panel.locator('#detail[open]').waitFor({state:'hidden'});await expanded(home,true);report.dialogEscapeKeepsPanelExpanded=true;
+ await escape(panel);await panel.locator('#detail[open]').waitFor({state:'hidden'});await expanded(home,true);report.dialogEscapeKeepsPanelExpanded=true;
  await home.locator('.wp-restore').click();await expanded(home,false);
  await panel.evaluate(()=>workPanel.action('settings',{mailDisplay:'reader'}));await choose(home,'notes');assert.equal(await body.inputValue(),draft);
  // Editor and home share the same setting, including a change made while an editor is active.
  await home.evaluate(()=>window.aiOffice.newHwp());
  const editor=await until(()=>app.context().pages().find(p=>p.url().includes('/hwp/renderer/index.html')||p.url().includes('hwp/index.html')),'HWP editor');await editor.locator('.hwp-app[data-phase="ready"]').waitFor({timeout:60000});
  await choose(editor,'notes');await until(()=>positioned(editor,'right'),'editor right');
- await editor.locator('.wp-expand').click();await expanded(editor,true);await assertBack(editor,false);await body.click();await panel.keyboard.press('Escape');await expanded(editor,false);assert.equal(await body.inputValue(),draft);
+ await editor.locator('.wp-expand').click();await expanded(editor,true);await assertBack(editor,false);await body.click();await escape(panel);await expanded(editor,false);assert.equal(await body.inputValue(),draft);
  await choose(editor,'ai');await editor.locator('.ai-panel-side-button').click();await until(()=>positioned(editor,'left'),'editor changes preference');
  await home.evaluate(async()=>{const list=await window.aiOfficeTabs.list();await window.aiOfficeTabs.activate(list.find(t=>t.kind==='home').id);});
  await until(()=>positioned(home,'left'),'home reflects editor setting');report.editorAndHomeSynced=true;
