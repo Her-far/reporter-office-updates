@@ -4,9 +4,10 @@ const root=__dirname,report={version:'1.0.12',cases:[],physicalPrinterTested:fal
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,label){for(let i=0;i<200;i++){const x=await fn();if(x)return x;await wait(150);}throw Error('Timed out: '+label);}
 async function status(app){return app.evaluate(({app})=>process.getBuiltinModule('module').createRequire(process.getBuiltinModule('path').join(app.getAppPath(),'package.json'))('./out/main/print-compat.cjs').status());}
-function observe(app,label){
+async function observe(app,label){
+ const actualPid=await app.evaluate(()=>process.pid);
  const output=path.join(root,`dialog-${label}-windows.json`);
- const watcher=spawn('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(root,'native-dialog-probe.ps1'),'-OfficeProcess',String(app.process().pid),'-Output',output],{windowsHide:true});
+ const watcher=spawn('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(root,'native-dialog-probe.ps1'),'-OfficeProcess',String(actualPid),'-Output',output],{windowsHide:true});
  let stderr='';watcher.stderr.on('data',d=>stderr+=d);
  const done=new Promise((resolve,reject)=>{watcher.on('error',reject);watcher.on('exit',code=>code===0?resolve():reject(Error('Native watcher '+code+': '+stderr)))});done.catch(()=>{});
  return {output,done};
@@ -31,7 +32,7 @@ async function verify(app,observed,initial,count,result){
    app.process().stderr?.on('data',chunk=>{report.stderr=((report.stderr??'')+chunk.toString()).slice(-12000);});
    const home=await app.firstWindow();await home.waitForFunction(()=>window.aiOffice?.openPath,{timeout:45000});
    const initial=await status(app);report.active={scale,initial};assert(initial.installed,JSON.stringify(initial));
-   const observed=observe(app,scale),result=path.join(root,`result-${scale}-windows.json`);
+   const observed=await observe(app,scale),result=path.join(root,`result-${scale}-windows.json`);
    await app.evaluate(async({BrowserWindow},file)=>{
     const win=new BrowserWindow({show:true,width:650,height:450,webPreferences:{sandbox:true}});
     await win.loadURL('data:text/html,<style>@page{size:A4;margin:0}body{margin:0}</style><p>Electimes print compatibility check</p>');
@@ -53,7 +54,7 @@ async function verify(app,observed,initial,count,result){
     await home.evaluate(p=>window.aiOffice.openPath(p),fixture);
     const page=await until(()=>app.context().pages().find(p=>p.url().includes('/hwp/')||p.url().includes('://hwp/')),'HWP editor');
     await page.locator('.hwp-app[data-phase="ready"]').waitFor({timeout:60000});
-    const hwpResult=path.join(root,'result-hwp-windows.json'),hwpObserved=observe(app,'hwp');
+    const hwpResult=path.join(root,'result-hwp-windows.json'),hwpObserved=await observe(app,'hwp');
     await app.evaluate(({ipcMain,webContents,BrowserWindow},file)=>{
      const sender=webContents.getAllWebContents().find(w=>w.getURL().includes('/hwp/')||w.getURL().includes('://hwp/'));
      if(!sender)throw Error('HWP view is unavailable');
