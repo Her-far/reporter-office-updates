@@ -13,7 +13,7 @@ namespace {
 using PrintDialog = HRESULT(WINAPI*)(LPPRINTDLGEXW);
 PrintDialog original = nullptr;
 std::atomic<unsigned> calls{0}, restored{0};
-std::atomic<int> before{-1}, inside{-1}, after{-1};
+std::atomic<int> before{-1}, inside{-1}, after{-1}, lastResult{0};
 bool installed = false;
 const char* failure = "not-installed";
 
@@ -28,6 +28,7 @@ HRESULT WINAPI CompatiblePrintDialog(LPPRINTDLGEXW options) {
   inside = static_cast<int>(GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext()));
   ++calls;
   const HRESULT result = original(options);
+  lastResult = static_cast<int>(result);
   if (saved) SetThreadDpiAwarenessContext(saved);
   after = static_cast<int>(GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext()));
   if (AreDpiAwarenessContextsEqual(old, GetThreadDpiAwarenessContext())) ++restored;
@@ -108,7 +109,7 @@ napi_value Status(napi_env env,napi_callback_info) {
   napi_set_named_property(env,obj,"installed",b);
   napi_create_string_utf8(env,failure,NAPI_AUTO_LENGTH,&s);napi_set_named_property(env,obj,"error",s);
   Number(env,obj,"calls",calls);Number(env,obj,"restored",restored);
-  Number(env,obj,"before",before);Number(env,obj,"inside",inside);Number(env,obj,"after",after);
+  Number(env,obj,"result",lastResult);Number(env,obj,"before",before);Number(env,obj,"inside",inside);Number(env,obj,"after",after);
   Number(env,obj,"current",static_cast<int>(GetAwarenessFromDpiAwarenessContext(GetThreadDpiAwarenessContext())));
   return obj;
 }

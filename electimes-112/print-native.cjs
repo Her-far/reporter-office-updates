@@ -28,8 +28,9 @@ async function verify(app,observed,initial,count,result){
  for(const scale of ['1','1.25','1.5','2']){
   const app=await _electron.launch({executablePath:path.join(root,'stage/Electimes Office.exe'),args:[`--user-data-dir=${fs.mkdtempSync(path.join(os.tmpdir(),'electimes-print-'))}`,`--force-device-scale-factor=${scale}`],env:{...process.env,GENOFFICE_NO_SPARE_VIEW:'1'},timeout:60000});
   try {
+   app.process().stderr?.on('data',chunk=>{report.stderr=((report.stderr??'')+chunk.toString()).slice(-12000);});
    const home=await app.firstWindow();await home.waitForFunction(()=>window.aiOffice?.openPath,{timeout:45000});
-   const initial=await status(app);assert(initial.installed,JSON.stringify(initial));
+   const initial=await status(app);report.active={scale,initial};assert(initial.installed,JSON.stringify(initial));
    const observed=observe(app,scale),result=path.join(root,`result-${scale}-windows.json`);
    await app.evaluate(async({BrowserWindow},file)=>{
     const win=new BrowserWindow({show:true,width:650,height:450,webPreferences:{sandbox:true}});
@@ -65,7 +66,7 @@ async function verify(app,observed,initial,count,result){
     assert(hwp.dialogs.some(d=>d.owner?.title==='전기신문 Office — 인쇄'&&d.owner.visible),'HWP native dialog has a visible Office print owner');
     entry.hwp={state:hwp.state,canceled:hwp.result,visibleOwner:true};
    }
-  }finally{await require('../electimes-111/close-app.cjs')(app);}
+  }catch(error){report.failure={state:await status(app).catch(()=>null),results:fs.readdirSync(root).filter(f=>/^result-.*-windows.json$/.test(f)).map(f=>({file:f,data:JSON.parse(fs.readFileSync(path.join(root,f)))}))};throw error;}finally{await require('../electimes-111/close-app.cjs')(app);}
  }
  console.log(JSON.stringify(report));
 })().catch(e=>{report.error=String(e);console.error(e);process.exitCode=1;}).finally(()=>fs.writeFileSync(path.join(root,'print-windows.json'),JSON.stringify(report,null,2)));

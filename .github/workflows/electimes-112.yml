@@ -48,7 +48,9 @@ jobs:
         shell: pwsh
         run: |
           Start-Service Spooler
-          Get-Printer | Format-Table Name,DriverName
+          $network = New-Object -ComObject WScript.Network
+          $network.SetDefaultPrinter('Microsoft Print to PDF')
+          Get-CimInstance Win32_Printer | Format-Table Name,Default,DriverName
           node print-native.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Native printing verification failed' }
       - name: Package full installer and compact update, then verify both installations
