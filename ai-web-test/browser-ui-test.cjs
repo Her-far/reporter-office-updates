@@ -18,7 +18,7 @@ function completeFreshBrowserSetup(){
   foreach($window in $windows){
    try{$name=(Get-Process -Id $window.Current.ProcessId -ErrorAction Stop).ProcessName}catch{continue}
    if($name -eq 'chrome'){$labels=@('Stay signed out')}
-   elseif($name -eq 'msedge'){$labels=@('Start without your data','Continue without signing in','Confirm and start browsing','Continue','Confirm','Get started')}
+   elseif($name -eq 'msedge'){$labels=@('Start without your data','Continue without signing in','Continue without data','Confirm and start browsing','Continue','Confirm','Get started')}
    else{continue}
    foreach($label in $labels){
     $condition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,$label)
@@ -51,6 +51,10 @@ async function aligned(id,p=home){let last;try{return await until(async()=>{cons
  // Use the public state API already exposed by the work-panel preload.
  await mode(home,'web');await until(()=>webState().then(s=>s?.browsers?.length),'browser discovery');
  const initial=await webState();
+ // The disposable CI VM has no human browser profile. Suppress Edge's
+ // install wizard only in this fixture, using Microsoft's supported policy.
+ // This code is not packaged or applied on user PCs.
+ if(process.env.GITHUB_ACTIONS==='true')execFileSync('reg.exe',['add','HKCU\\SOFTWARE\\Policies\\Microsoft\\Edge','/v','HideFirstRunExperience','/t','REG_DWORD','/d','1','/f'],{stdio:'ignore'});
  // CI starts with fresh browser profiles. Seed ordinary blank windows once to
  // skip browser-install onboarding, which is unrelated to service login.
  for(const [id,tail]of [['chrome','Google/Chrome/Application/chrome.exe'],['edge','Microsoft/Edge/Application/msedge.exe']]){if(!initial.browsers.includes(id))continue;const exe=[process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean).map(p=>path.join(p,tail)).find(p=>fs.existsSync(p));if(exe){const child=spawn(exe,['--no-default-browser-check','--new-window','about:blank'],{detached:true,stdio:'ignore'});child.unref();}}
