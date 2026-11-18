@@ -28,6 +28,7 @@ jobs:
           node --test workpanel/tests/core.test.cjs workpanel/tests/calendar-connect.test.cjs workpanel/tests/downloads.test.cjs workpanel/tests/mail-reader.test.cjs workpanel/tests/mail-reader-protocol.test.cjs workpanel/tests/linked-attachment.test.cjs workpanel/tests/notes.test.cjs workpanel/tests/migrate.test.cjs workpanel/tests/local-google-client.test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Service regression failed' }
       - name: Build public source on production 1.0.6
+        id: build
         working-directory: electimes-109
         shell: pwsh
         run: |
@@ -40,6 +41,7 @@ jobs:
           node --test workpanel/tests/update-confirm.test.cjs workpanel/tests/update-handoff.test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Update confirmation regression failed' }
       - name: Verify fresh Google connection and live relay
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 4
         working-directory: electimes-109
         shell: pwsh
@@ -47,6 +49,7 @@ jobs:
           node google-connect.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Google connection regression failed' }
       - name: Verify real panel, migration and common width
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 4
         working-directory: electimes-109
         shell: pwsh
@@ -54,6 +57,7 @@ jobs:
           node workpanel-ui.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Native work panel regression failed' }
       - name: Verify panel collapse, recovery and left-right movement
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 5
         working-directory: electimes-109
         shell: pwsh
@@ -61,6 +65,7 @@ jobs:
           node panel-layout.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Panel layout regression failed' }
       - name: Verify DOC close and reopen through Recent and drop
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 4
         working-directory: electimes-109
         shell: pwsh
@@ -68,6 +73,7 @@ jobs:
           node doc-reopen.cjs
           if ($LASTEXITCODE -ne 0) { throw 'DOC reopen regression failed' }
       - name: Verify Find dismissal returns keyboard input to HWP and DOCX
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 5
         working-directory: electimes-109
         shell: pwsh
@@ -75,6 +81,7 @@ jobs:
           node find-focus.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Find keyboard focus regression failed' }
       - name: Verify clickable mail body attachments and keyboard links
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 4
         working-directory: electimes-109
         shell: pwsh
@@ -82,6 +89,7 @@ jobs:
           node mail-links.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Mail file link regression failed' }
       - name: Verify update download waits for explicit restart
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 6
         working-directory: electimes-109
         shell: pwsh
@@ -89,6 +97,7 @@ jobs:
           node update-download.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Update download regression failed' }
       - name: Verify legacy and fixed UI install and relaunch
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         timeout-minutes: 10
         working-directory: electimes-109
         shell: pwsh
@@ -96,6 +105,7 @@ jobs:
           node update-install.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Real update install/relaunch failed' }
       - name: Package and inspect installer
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         working-directory: electimes-109
         shell: pwsh
         run: |
