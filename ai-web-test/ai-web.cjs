@@ -40,7 +40,7 @@ function create(deps){
   const wc=view.webContents;wc.setWindowOpenHandler(()=>({action:'deny'}));wc.on('will-navigate',e=>e.preventDefault());wc.on('will-attach-webview',e=>e.preventDefault());wc.on('did-finish-load',emit);
   wc.on('before-input-event',(e,input)=>{if(visible&&input.type==='keyDown'&&input.key==='Escape'&&!input.isComposing&&deps.expanded()){e.preventDefault();deps.restore();}});
   wc.on('context-menu',(_e,p)=>Menu.buildFromTemplate([{role:'copy',enabled:!!p.selectionText},{role:'paste',enabled:p.isEditable},{role:'selectAll'}]).popup({window:deps.window()}));
-  wc.on('render-process-gone',()=>{cli.close();view=null;error='대화 화면이 종료됐습니다. 패널을 다시 열어 주세요.';});
+  wc.on('render-process-gone',()=>{for(const id of cli.items.keys())cli.stop(id);view=null;error='대화 화면이 종료됐습니다. 패널을 다시 열어 주세요.';});
   view.setVisible(false);void wc.loadFile(path.join(__dirname,'plan-panel.html')).catch(e=>{error=e.message;emit();});
  }
  function hide(){visible=false;view?.setVisible(false);}
