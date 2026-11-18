@@ -27,6 +27,18 @@ async function runCase(legacy){
   const welcome=page.locator('.onb-overlay');await welcome.waitFor({state:'visible',timeout:10000}).catch(()=>{});
   if(await welcome.isVisible())await welcome.getByRole('button',{name:/^Skip$|건너뛰기/}).click();
   const data=await app.evaluate(({app})=>app.getPath('userData')),cache=path.join(data,'electimes-updates');
+  if(!legacy)entry.helperProbe=await app.evaluate(async(_electron,base)=>{
+   const fs=process.getBuiltinModule('fs'),cp=process.getBuiltinModule('child_process'),path=process.getBuiltinModule('path');const results=[];
+   for(const mode of ['pipe','detached-pipe','detached-file']){
+    const marker=path.join(base,'probe-'+mode),log=marker+'.log';const source="[IO.File]::WriteAllText('"+marker.replaceAll("'","''")+"', 'started'); Write-Output 'started'";
+    const fd=mode==='detached-file'?fs.openSync(log,'w'):null;
+    const options={windowsHide:true,detached:mode!=='pipe',stdio:fd===null?['ignore','pipe','pipe']:['ignore',fd,fd]};
+    const result=await new Promise(resolve=>{let out='',err='',timer;const child=cp.spawn(path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe'),['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(source,'utf16le').toString('base64')],options);child.stdout?.on('data',b=>out+=b);child.stderr?.on('data',b=>err+=b);child.on('error',e=>{clearTimeout(timer);resolve({error:String(e)})});child.on('exit',(code,signal)=>{clearTimeout(timer);resolve({code,signal,out,err,wrote:fs.existsSync(marker)})});timer=setTimeout(()=>{child.kill();resolve({timeout:true,out,err,wrote:fs.existsSync(marker)})},8000)});
+    if(fd!==null)fs.closeSync(fd);results.push({mode,...result,log:fs.existsSync(log)?fs.readFileSync(log,'utf8'):''});
+   }
+   return results;
+  },profile);
+
   logsDir=cache;const resultFile=path.join(cache,'install-result.json');
   const trace=path.join(cache,'update-process-trace.jsonl');
   await app.evaluate(({app},file)=>{

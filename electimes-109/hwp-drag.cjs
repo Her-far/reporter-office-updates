@@ -5,7 +5,7 @@ const report={version:'1.0.9',nativePackaged:true};let app;
 async function until(fn,label,ms=60000){const end=Date.now()+ms;while(Date.now()<end){const v=await fn();if(v)return v;await new Promise(r=>setTimeout(r,100))}throw Error('Timed out: '+label)}
 (async()=>{
  const core=await import(pathToFileURL(path.join(studio,'rhwp.js')));core.initSync({module:fs.readFileSync(path.join(studio,'assets/rhwp_bg-BmBlhBaD.wasm'))});
- const doc=core.HwpDocument.createEmpty();const html=Array.from({length:160},(_,i)=>`<p>LINE_${String(i).padStart(3,'0')} long selection across pages.</p>`+(i%30===15?`<table><tr><td>TABLE_${i}</td><td>Second cell</td></tr><tr><td>Next row</td><td>End cell</td></tr></table>`:'')).join('');
+ const doc=core.HwpDocument.createEmpty();doc.createBlankDocument();const html=Array.from({length:160},(_,i)=>`<p>LINE_${String(i).padStart(3,'0')} long selection across pages.</p>`+(i%30===15?`<table><tr><td>TABLE_${i}</td><td>Second cell</td></tr><tr><td>Next row</td><td>End cell</td></tr></table>`:'')).join('');
  assert.equal(JSON.parse(doc.pasteHtml(0,0,0,html)).ok,true);const bytes=doc.exportHwp();const fixture=path.join(root,'long-selection-fixture.hwp');fs.writeFileSync(fixture,bytes);
  const loaded=new core.HwpDocument(bytes);report.pages=loaded.pageCount();assert(report.pages>=4);const first=JSON.parse(loaded.getCursorRect(0,0,0));const info=JSON.parse(loaded.getPageInfo(0));
  app=await _electron.launch({executablePath:path.join(root,'stage/Electimes Office.exe'),args:[`--user-data-dir=${fs.mkdtempSync(path.join(os.tmpdir(),'hwp-drag-'))}`],env:{...process.env,GENOFFICE_NO_SPARE_VIEW:'1',GENOFFICE_LANG:'en'},timeout:60000});

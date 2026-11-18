@@ -40,7 +40,7 @@ async function until(fn,label,ms=45000){const end=Date.now()+ms;while(Date.now()
   report.cases.push({editor:kind,close:'button',arrowThenTyping:true});
   await find('target','escape');await keys.type('X');assert.equal(await text(),kind==='hwp'?'alpha X Zomega':'alpha XZ omega');
   report.cases.push({editor:kind,close:'escape',replaceFoundText:true});
-  await input.evaluate(e=>e.focus());await keys.press('ArrowRight');if(kind==='docs'){await input.evaluate(e=>{const view=e.pmViewDesc?.view;if(!view)throw Error('Missing editor view');view.dispatch(view.state.tr.setSelection(view.state.selection.constructor.near(view.state.doc.resolve(view.state.doc.content.size),-1)));view.focus()});}await find('not-present','escape');await keys.type('!');assert.equal(await text(),kind==='hwp'?'alpha X Zomega!':'alpha XZ omega!');
+  await input.evaluate(e=>e.focus());await keys.press('ArrowRight');if(kind==='docs'){await input.evaluate(e=>{const editor=e.editor;if(!editor)throw Error('Missing editor instance');editor.commands.setTextSelection(editor.state.doc.content.size-1);editor.view.focus();if(!editor.state.selection.empty)throw Error('Fixture caret is not collapsed')});}await find('not-present','escape');await keys.type('!');assert.equal(await text(),kind==='hwp'?'alpha X Zomega!':'alpha XZ omega!');
   report.cases.push({editor:kind,noMatchPreservesCaret:true});
   await home.locator('.tab-close').last().click();
  }
