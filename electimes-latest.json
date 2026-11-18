@@ -3,18 +3,17 @@
   "platform": "win32-x64",
   "version": "1.0.12",
   "build": 112,
-  "minBuild": 111,
+  "minBuild": 106,
   "maxBuild": 111,
   "notes": [
-    "Windows 인쇄 기본 설정창과 내부 항목을 동일한 화면 배율로 표시하도록 호환성을 개선했습니다.",
-    "HWP 인쇄 설정창이 오피스 앞에 표시되도록 임시 인쇄창 처리를 수정했습니다.",
-    "1.0.11에서는 변경 파일만 다운로드합니다. 이전 버전은 전체 설치판으로 업데이트합니다.",
-    "1.0.11의 HWP 붙여넣기·줄 간격 및 이전 패널 수정은 유지합니다."
+    "1.0.6~1.0.11에서 중간 버전을 건너뛰어도 변경 파일만 받는 누적 업데이트를 제공합니다.",
+    "Windows 인쇄 설정창의 배율 호환성과 HWP 인쇄창 표시를 개선했습니다.",
+    "기존 HWP 붙여넣기·줄 간격·문서 재열기 및 패널 수정이 모두 포함됩니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Update-1.0.12-x64.exe",
-    "size": 16029815,
-    "sha256": "a0090bc7d60ef61ab645826b52d4f9595a8cee921ee3dca558333d9ff68e4db1"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Update-1.0.12-Cumulative-x64.exe",
+    "size": 27012696,
+    "sha256": "aaf4b308492a41eb4b39b4c53daf86b832528e462feae06498113fbcfb8130fa"
   },
   "fullInstaller": {
     "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Setup-1.0.12-x64.exe",
