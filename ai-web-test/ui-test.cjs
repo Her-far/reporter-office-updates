@@ -37,9 +37,9 @@ async function snapshot(name){await home.screenshot({path:path.join(root,name+'.
  ok('Provider cookies are isolated',Object.entries(partitions).every(([id,values])=>values.length===1&&values[0]===id));
  await chat.locator('#next').click();await chat.waitForURL('**/fixture-next');await home.locator('[data-ai-command=back]').click();await chat.waitForURL('https://chatgpt.com/');
  await home.locator('[data-ai-command=forward]').click();await chat.waitForURL('**/fixture-next');ok('Provider navigation and history work');
- await chat.locator('#google').click();await until(()=>home.locator('.wp-ai-status').innerText().then(x=>x.includes('Google 로그인')),'Google fallback notice');ok('Google embedded login is blocked with an external browser fallback',chat.url().startsWith('https://chatgpt.com/'));
+ await chat.locator('#google').click({noWaitAfter:true});await until(()=>home.locator('.wp-ai-status').innerText().then(x=>x.includes('Google 로그인')),'Google fallback notice');ok('Google embedded login is blocked with an external browser fallback',chat.url().startsWith('https://chatgpt.com/'));
  await home.locator('[data-ai-command=new]').click();await chat.waitForURL('https://chatgpt.com/');
- await chat.locator('#unsafe').click();ok('Local-file navigation cannot leave provider',chat.url().startsWith('https://chatgpt.com/'));
+ await chat.locator('#unsafe').click({noWaitAfter:true});ok('Local-file navigation cannot leave provider',chat.url().startsWith('https://chatgpt.com/'));
  await chat.locator('#prompt').fill('');await chat.locator('#prompt').click();await app.evaluate(({clipboard})=>clipboard.writeText('사용자가 복사한 질문'));
  await home.locator('[data-ai-command=paste-ai]').click();await until(()=>chat.locator('#prompt').inputValue().then(x=>x==='사용자가 복사한 질문'),'paste into AI');ok('Explicit paste button sends only user clipboard text');
  const originalWidth=await home.locator('.wp-dock').evaluate(n=>n.getBoundingClientRect().width);
