@@ -29,7 +29,9 @@ new='''            let zone_layout = col_content.zone_layout.as_ref().unwrap_or(
                 .iter()
                 .take_while(|col| (col.zone_y_offset - col_content.zone_y_offset).abs() <= 0.1)
                 .count();
-            let body_wide_reserved = if zone_layout.column_areas.len() > 1 {
+            let body_wide_reserved = if zone_layout.column_areas.len() > 1
+                && zone_end - zone_start > 1
+            {
                 self.calculate_body_wide_shape_reserved(
                     paragraphs,
                     &page_content.column_contents[zone_start..zone_end],

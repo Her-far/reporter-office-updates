@@ -59,7 +59,7 @@ if(fs.existsSync(out))throw Error('Output already exists; select a new empty fol
 // NSIS generates the new version; never ship the previous generated executable as payload.
 for(const name of fs.readdirSync(out))if(/^uninstall\.exe$/i.test(name))fs.rmSync(path.join(out,name));
 fs.writeFileSync(path.join(out,'resources/app.asar'),asar.rewriteArchive(orig,rep));
-const modified=[];
+const modified=[require('./hwp-engine.cjs')(out)];
 modified.push(require('./compact-autosave.cjs')(path.join(out,'resources/modules/hwp/renderer'),exact));
 modified.push(...require('./find-focus.cjs')(path.join(out,'resources/modules'),exact));
 modified.push(...require('./hwp-selection.cjs')(path.join(out,'resources/modules'),exact));

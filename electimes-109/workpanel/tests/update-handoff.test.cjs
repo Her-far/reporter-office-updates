@@ -5,10 +5,10 @@ function fixture(mode='ready'){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'handoff-unit-')),child=Object.assign(new EventEmitter(),{pid:123,exitCode:null,signalCode:null,killed:false,unref(){},kill(){this.killed=true;this.signalCode='SIGTERM'}});
  let ready,commit;
  const module={exports:{}};
- vm.runInNewContext(source,{module,Buffer,process,setTimeout,require:name=>name==='node:child_process'?{spawn(_command,args){
-  assert.equal(args.at(-2),'-File');const script=fs.readFileSync(args.at(-1),'utf8');
-  ready=script.match(/WriteAllText\('([^']+)'/)[1];commit=script.match(/Test-Path -LiteralPath '([^']+)'/)[1];
-  if(mode==='ready')setTimeout(()=>fs.writeFileSync(ready,'ready'),5);else setTimeout(()=>child.emit('error',Error('helper unavailable')),5);
+ vm.runInNewContext(source,{module,Buffer,process:{...process,kill(pid,signal){if(pid!==456)throw Error('Unexpected helper PID');if(signal!==0)child.killed=true;}},setTimeout,require:name=>name==='node:child_process'?{spawn(_command,args){
+  assert.equal(args.at(-2),'-EncodedCommand');const launcher=Buffer.from(args.at(-1),'base64').toString('utf16le');const file=launcher.match(/'"([^"]+\.ps1)"'/)[1];const script=fs.readFileSync(file,'utf8');
+  ready=script.match(/WriteAllText\('([^']+)'/)[1];commit=script.match(/Test-Path -LiteralPath '([^']+\.commit)'/)[1];
+  if(mode==='ready')setTimeout(()=>fs.writeFileSync(ready,'456'),5);else setTimeout(()=>child.emit('error',Error('helper unavailable')),5);
   return child;
  }}:require(name)});
  return {dir,child,api:module.exports,get ready(){return ready},get commit(){return commit}};

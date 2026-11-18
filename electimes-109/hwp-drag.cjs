@@ -13,6 +13,8 @@ async function until(fn,label,ms=60000){const end=Date.now()+ms;while(Date.now()
  const welcome=home.locator('.onb-overlay');await welcome.waitFor({state:'visible',timeout:10000}).catch(()=>{});if(await welcome.isVisible())await welcome.getByRole('button',{name:/^Skip$|건너뛰기/}).click();
  await home.evaluate(p=>window.aiOffice.openPath(p),fixture);
  const page=await until(()=>app.context().pages().find(p=>p.url().includes('/hwp/')||p.url().includes('://hwp/')),'HWP editor');await page.locator('.hwp-app[data-phase="ready"]').waitFor({timeout:60000});
+ if(await page.locator('.wp-dock').isVisible())await page.locator('.ai-panel-collapse').click();
+ await until(()=>page.locator('.wp-dock').isVisible().then(v=>!v),'editor area unobstructed');
  frame=await until(()=>page.frames().find(f=>f.url().includes('/studio/')),'studio');
  await frame.locator('.document-page-canvas').first().waitFor();
  const canvas=await frame.locator('.document-page-canvas').first().boundingBox();const scroll=await frame.locator('#scroll-container').boundingBox();const scale=canvas.width/info.width;report.geometry={canvas,scroll,first,info,scale};

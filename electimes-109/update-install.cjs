@@ -83,7 +83,7 @@ async function runCase(legacy){
  finally{
   if(app&&child?.exitCode===null)await require('./close-app.cjs')(app).catch(()=>{});
   const dataLogs=logsDir||path.join(profile,'electimes-updates');
-  for(const name of ['install-handoff.log','update-process-trace.jsonl'])if(fs.existsSync(path.join(dataLogs,name)))entry[name]=fs.readFileSync(path.join(dataLogs,name),'utf8').slice(-12000);
+  for(const name of fs.existsSync(dataLogs)?fs.readdirSync(dataLogs).filter(n=>/^install-handoff.*\.(log|ready|commit|cancel)$/.test(n)||n==='update-process-trace.jsonl'):[])if(fs.existsSync(path.join(dataLogs,name)))entry[name]=fs.readFileSync(path.join(dataLogs,name),'utf8').slice(-12000);
   try{ps(`$p = Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq ${quote(exe)} }; $p | ForEach-Object { [void]$_.CloseMainWindow() }; Start-Sleep -Seconds 2; Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq ${quote(exe)} } | Stop-Process -Force`)}catch(e){entry.cleanupError=String(e)}
  }
 }
