@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),asse
 const root=__dirname,report={version:'1.0.12',cases:[],physicalPrinterTested:false};
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 async function until(fn,label){for(let i=0;i<200;i++){const x=await fn();if(x)return x;await wait(150);}throw Error('Timed out: '+label);}
-async function status(app){return app.evaluate(({app})=>require(require('node:path').join(app.getAppPath(),'out/main/print-compat.cjs')).status());}
+async function status(app){return app.evaluate(({app})=>process.getBuiltinModule('module').createRequire(process.getBuiltinModule('path').join(app.getAppPath(),'package.json'))('./out/main/print-compat.cjs').status());}
 function observe(app,label){
  const output=path.join(root,`dialog-${label}-windows.json`);
  const watcher=spawn('powershell.exe',['-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',path.join(root,'native-dialog-probe.ps1'),'-OfficeProcess',String(app.process().pid),'-Output',output],{windowsHide:true});
@@ -35,12 +35,12 @@ async function verify(app,observed,initial,count,result){
     const win=new BrowserWindow({show:true,width:650,height:450,webPreferences:{sandbox:true}});
     await win.loadURL('data:text/html,<style>@page{size:A4;margin:0}body{margin:0}</style><p>Electimes print compatibility check</p>');
     global.__printTestWindow=win;
-    setTimeout(()=>win.webContents.print({silent:false,printBackground:true},(ok,error)=>{require('node:fs').writeFileSync(file,JSON.stringify({ok,error}));}),200);
+    setTimeout(()=>win.webContents.print({silent:false,printBackground:true},(ok,error)=>{process.getBuiltinModule('fs').writeFileSync(file,JSON.stringify({ok,error}));}),200);
    },result);
    const checked=await verify(app,observed,initial,1,result);
    assert.equal(checked.result.ok,false);assert.match(checked.result.error,/cancel/i);
    const pdf=path.join(root,`test-${scale}.pdf`);
-   await app.evaluate(async({app},file)=>{const win=global.__printTestWindow;const data=await win.webContents.printToPDF({preferCSSPageSize:true,printBackground:true});require('node:fs').writeFileSync(file,data);win.destroy();},pdf);
+   await app.evaluate(async({app},file)=>{const win=global.__printTestWindow;const data=await win.webContents.printToPDF({preferCSSPageSize:true,printBackground:true});process.getBuiltinModule('fs').writeFileSync(file,data);win.destroy();},pdf);
    const bytes=fs.readFileSync(pdf);assert(bytes.subarray(0,5).equals(Buffer.from('%PDF-')));assert(bytes.length>1000);
    const media=bytes.toString('latin1').match(/\/MediaBox\s*\[([^\]]+)\]/)?.[1];assert(media,'PDF page dimensions');
    const entry={scale,initial,state:checked.state,canceled:checked.result,dialogCount:checked.dialogs.length,mediaBox:media};report.cases.push(entry);
@@ -59,7 +59,7 @@ async function verify(app,observed,initial,count,result){
      const handler=ipcMain._invokeHandlers.get('hwp:print-pages');if(!handler)throw Error('HWP printing is unregistered');
      const owner=BrowserWindow.fromWebContents(sender)??BrowserWindow.getFocusedWindow();owner?.focus();
      const job={mode:'print',pages:[{width:793.7007874,height:1122.519685,svg:'<svg xmlns="http://www.w3.org/2000/svg" width="793.7" height="1122.52"><text x="40" y="50">HWP print path test</text></svg>'}],images:[]};
-     setTimeout(async()=>{let r;try{r=await handler({sender},job)}catch(e){r={error:String(e)}}require('node:fs').writeFileSync(file,JSON.stringify(r));},200);
+     setTimeout(async()=>{let r;try{r=await handler({sender},job)}catch(e){r={error:String(e)}}process.getBuiltinModule('fs').writeFileSync(file,JSON.stringify(r));},200);
     },hwpResult);
     const hwp=await verify(app,hwpObserved,initial,2,hwpResult);assert.equal(hwp.result.ok,true,JSON.stringify(hwp.result));
     assert(hwp.dialogs.some(d=>d.owner?.title==='전기신문 Office — 인쇄'&&d.owner.visible),'HWP native dialog has a visible Office print owner');
