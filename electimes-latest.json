@@ -1,23 +1,23 @@
 {
   "product": "electimes-office",
   "platform": "win32-x64",
-  "version": "1.0.12",
-  "build": 112,
+  "version": "1.0.14",
+  "build": 114,
   "minBuild": 106,
-  "maxBuild": 111,
+  "maxBuild": 113,
   "notes": [
-    "1.0.6~1.0.11에서 중간 버전을 건너뛰어도 변경 파일만 받는 누적 업데이트를 제공합니다.",
-    "Windows 인쇄 설정창의 배율 호환성과 HWP 인쇄창 표시를 개선했습니다.",
-    "기존 HWP 붙여넣기·줄 간격·문서 재열기 및 패널 수정이 모두 포함됩니다."
+    "홈 화면과 Windows 탐색기에 파일 형식별 색띠와 전기신문 로고를 적용했습니다.",
+    "최근 문서 필터에서 한글을 전체 다음에 배치했습니다.",
+    "웹 AI를 포함하며 1.0.6~1.0.13에서 누적 패치로 업데이트할 수 있습니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Update-1.0.12-Cumulative-x64.exe",
-    "size": 27012696,
-    "sha256": "aaf4b308492a41eb4b39b4c53daf86b832528e462feae06498113fbcfb8130fa"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.14/ElectimesOffice-Update-1.0.14-x64.exe",
+    "size": 31631539,
+    "sha256": "aeacb09ee39ebd2a15df2b6de7b0bc7c65ca7177b650be9177a081fe425dd221"
   },
   "fullInstaller": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Setup-1.0.12-x64.exe",
-    "size": 300226743,
-    "sha256": "8060e3e6e89bf33aed3d3a99fa00d1ea8e85cba22d42c3bc6693b47a38604431"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.14/ElectimesOffice-Setup-1.0.14-x64.exe",
+    "size": 300904485,
+    "sha256": "ccd3281504900dda5885919c992869661d1b6408b96bcf7d0be4eb223a30cea2"
   }
 }
