@@ -103,11 +103,19 @@
          self.document.sections[section_idx].raw_stream = None;
 --- a/src/document_core/commands/text_editing.rs
 +++ b/src/document_core/commands/text_editing.rs
-@@ -34,6 +34,15 @@
-                 && current.tag & LineSeg::TAG_IMPLEMENTATION_PROPERTY == 0
+@@ -12,7 +12,7 @@
+ use crate::model::document::Document;
+ use crate::model::event::DocumentEvent;
+ use crate::model::page::ColumnDef;
+-use crate::model::paragraph::{LineSeg, ParaMeta, Paragraph};
++use crate::model::paragraph::{CharShapeRef, EmptyPrefixFormat, LineSeg, ParaMeta, Paragraph};
+ use crate::model::shape::{ShapeObject, TextWrap, VertRelTo};
+ use crate::model::style::Alignment;
+ use crate::renderer::composer::{
+@@ -35,6 +35,85 @@
          }
          _ => false,
-+    }
+     }
 +}
 +
 +/// Capture stored RowBreak frame boundaries before text or paragraph insertion changes
@@ -116,10 +124,81 @@
 +    for idx in 1..paragraphs.len() {
 +        let reset = cell_vpos_resets(&paragraphs[idx - 1], &paragraphs[idx]);
 +        paragraphs[idx].cell_vpos_reset = Some(reset);
-     }
++    }
++}
++
++/// Removing a blank separator must not replace the following body's paragraph
++/// style with that blank line's compact spacing. Keep undo data for both sides.
++fn merge_cell_paragraph_with_format(
++    previous: &mut Paragraph,
++    next: &Paragraph,
++    para_shapes: &[crate::model::style::ParaShape],
++) -> (usize, ParaMeta) {
++    let mut removed_meta = next.capture_meta();
++    let empty_prefix =
++        previous.text.is_empty() && previous.controls.is_empty() && !next.text.is_empty();
++    if empty_prefix {
++        removed_meta.empty_prefix_format = Some(EmptyPrefixFormat {
++            para_shape_id: previous.para_shape_id,
++            style_id: previous.style_id,
++            char_shapes: previous
++                .char_shapes
++                .iter()
++                .map(|shape| (shape.start_pos, shape.char_shape_id))
++                .collect(),
++        });
++        // Retain the surviving paragraph identity and explicit break metadata.
++        let mut format = previous.capture_meta();
++        format.para_shape_id = next.para_shape_id;
++        format.style_id = next.style_id;
++        restore_para_meta(previous, format, para_shapes);
++    }
++    let offset = previous.merge_from(next);
++    if empty_prefix {
++        previous.char_shapes = next.char_shapes.clone();
++    }
++    (offset, removed_meta)
++}
++
++fn empty_prefix_restore(
++    meta: &Option<ParaMeta>,
++    para_shapes: &[crate::model::style::ParaShape],
++) -> Option<(EmptyPrefixFormat, i32, i32)> {
++    let meta = meta.as_ref()?;
++    let format = meta.empty_prefix_format.as_ref()?;
++    let indent = |id: u16| {
++        para_shapes
++            .get(usize::from(id))
++            .map_or(0, |shape| shape.indent)
++    };
++    Some((
++        format.clone(),
++        indent(meta.para_shape_id),
++        indent(format.para_shape_id),
++    ))
++}
++
++fn restore_empty_prefix(paragraph: &mut Paragraph, restore: &(EmptyPrefixFormat, i32, i32)) {
++    let (format, old_indent, new_indent) = restore;
++    paragraph.para_shape_id = format.para_shape_id;
++    paragraph.style_id = format.style_id;
++    paragraph.char_shapes = format
++        .char_shapes
++        .iter()
++        .map(|&(start_pos, char_shape_id)| CharShapeRef {
++            start_pos,
++            char_shape_id,
++        })
++        .collect();
++    crate::renderer::composer::restamp_indentation(
++        &mut paragraph.line_segs,
++        *old_indent,
++        *new_indent,
++    );
  }
  
-@@ -3388,6 +3397,18 @@
+ fn recalculate_cell_paragraph_vpos(
+@@ -3388,6 +3467,18 @@
  
          if let Some((ppi, ci, cei)) = cell_ctx {
              // ─── 셀 내 deleteRange ───
@@ -138,7 +217,7 @@
              if start_para == end_para {
                  // 같은 문단 내 삭제
                  let count = end_offset - start_offset;
-@@ -3440,6 +3461,15 @@
+@@ -3440,6 +3531,15 @@
                  self.reflow_cell_paragraph(section_idx, ppi, ci, cei, start_para);
              }
  
@@ -154,7 +233,83 @@
              // 부모 컨트롤 dirty 마킹 + 재페이지네이션
              self.mark_cell_control_dirty(section_idx, ppi, ci);
              self.mark_section_dirty(section_idx);
-@@ -6056,6 +6086,7 @@
+@@ -4644,6 +4744,8 @@
+         char_offset: usize,
+         restore_meta: Option<ParaMeta>,
+     ) -> Result<String, HwpError> {
++        let prefix_restore =
++            empty_prefix_restore(&restore_meta, &self.document.doc_info.para_shapes);
+         // 셀 문단 검증 및 분할
+         let cell_para = self.get_cell_paragraph_mut(
+             section_idx,
+@@ -4654,6 +4756,9 @@
+         )?;
+         let original_vpos = cell_para.line_segs.first().map(|seg| seg.vertical_pos);
+         let mut new_para = cell_para.split_at(char_offset);
++        if let Some(ref restore) = prefix_restore {
++            restore_empty_prefix(cell_para, restore);
++        }
+         if let Some(meta) = restore_meta {
+             restore_para_meta(&mut new_para, meta, &self.document.doc_info.para_shapes);
+         }
+@@ -4790,6 +4895,7 @@
+         // 사라지는 문단의 스코프 메타를 캡처해 결과에 실어 보낸다 — undo(split)가 이걸
+         // 되돌려주지 않으면 되살아난 문단이 앞 문단 서식을 뒤집어쓴다 (Task #2342).
+         let removed_meta;
++        let para_shapes = &self.document.doc_info.para_shapes;
+         match self.document.sections[section_idx].paragraphs[parent_para_idx]
+             .controls
+             .get_mut(control_idx)
+@@ -4802,19 +4908,28 @@
+                         HwpError::RenderError("지정된 표 컨트롤에 캡션이 없습니다".to_string())
+                     })?;
+                     let removed = cap.paragraphs.remove(cell_para_idx);
+-                    removed_meta = removed.capture_meta();
+-                    merge_point = cap.paragraphs[prev_idx].merge_from(&removed);
++                    (merge_point, removed_meta) = merge_cell_paragraph_with_format(
++                        &mut cap.paragraphs[prev_idx],
++                        &removed,
++                        para_shapes,
++                    );
+                 } else {
+                     let removed = table.cells[cell_idx].paragraphs.remove(cell_para_idx);
+-                    removed_meta = removed.capture_meta();
+-                    merge_point = table.cells[cell_idx].paragraphs[prev_idx].merge_from(&removed);
++                    (merge_point, removed_meta) = merge_cell_paragraph_with_format(
++                        &mut table.cells[cell_idx].paragraphs[prev_idx],
++                        &removed,
++                        para_shapes,
++                    );
+                 }
+             }
+             Some(Control::Shape(shape)) => {
+                 if let Some(tb) = super::super::helpers::get_textbox_from_shape_mut(shape) {
+                     let removed = tb.paragraphs.remove(cell_para_idx);
+-                    removed_meta = removed.capture_meta();
+-                    merge_point = tb.paragraphs[prev_idx].merge_from(&removed);
++                    (merge_point, removed_meta) = merge_cell_paragraph_with_format(
++                        &mut tb.paragraphs[prev_idx],
++                        &removed,
++                        para_shapes,
++                    );
+                 } else {
+                     return Err(HwpError::RenderError(
+                         "지정된 Shape 컨트롤에 텍스트 박스가 없습니다".to_string(),
+@@ -4824,8 +4939,11 @@
+             Some(Control::Picture(pic)) => {
+                 if let Some(ref mut cap) = pic.caption {
+                     let removed = cap.paragraphs.remove(cell_para_idx);
+-                    removed_meta = removed.capture_meta();
+-                    merge_point = cap.paragraphs[prev_idx].merge_from(&removed);
++                    (merge_point, removed_meta) = merge_cell_paragraph_with_format(
++                        &mut cap.paragraphs[prev_idx],
++                        &removed,
++                        para_shapes,
++                    );
+                 } else {
+                     return Err(HwpError::RenderError(
+                         "지정된 그림 컨트롤에 캡션이 없습니다".to_string(),
+@@ -6056,6 +6174,7 @@
      ) -> Result<String, HwpError> {
          {
              let paras = self.get_cell_paragraphs_mut_by_path(section_idx, parent_para_idx, path)?;
@@ -162,7 +317,7 @@
              if start_para == end_para {
                  let count = end_offset.saturating_sub(start_offset);
                  if count > 0 {
-@@ -6101,11 +6132,15 @@
+@@ -6101,11 +6220,15 @@
              }
          }
  
@@ -182,3 +337,75 @@
  
          // dirty/이벤트는 delete_text_in_cell_by_path 와 동형(최외곽 컨트롤 기준).
          let outer_ctrl = path[0].0;
+@@ -6143,6 +6266,8 @@
+             .last()
+             .ok_or_else(|| HwpError::RenderError("경로가 비어있습니다".to_string()))?;
+         let cell_para_idx = last.2;
++        let prefix_restore =
++            empty_prefix_restore(&restore_meta, &self.document.doc_info.para_shapes);
+         // [#2755] 리플로우 후 재적용할 원본 vpos(분할 대상 문단 첫 seg).
+         let mut split_origin_vpos: Option<i32> = None;
+ 
+@@ -6177,6 +6302,9 @@
+                     .first()
+                     .map(|seg| seg.vertical_pos);
+                 let mut new_para = cell.paragraphs[cell_para_idx].split_at(char_offset);
++                if let Some(ref restore) = prefix_restore {
++                    restore_empty_prefix(&mut cell.paragraphs[cell_para_idx], restore);
++                }
+                 if let Some(meta) = restore_meta {
+                     restore_para_meta(&mut new_para, meta, &self.document.doc_info.para_shapes);
+                 }
+@@ -6263,6 +6391,7 @@
+         let mut merge_point = 0usize;
+         // 사라지는 문단의 스코프 메타 — undo(split)가 되돌릴 값이다 (Task #2342).
+         let mut removed_meta: Option<ParaMeta> = None;
++        let para_shapes = &self.document.doc_info.para_shapes;
+         for (i, &(ctrl_idx, cell_idx, _cpi)) in path.iter().enumerate() {
+             let table = match para.controls.get_mut(ctrl_idx) {
+                 Some(Control::Table(t)) => t.as_mut(),
+@@ -6281,10 +6410,13 @@
+                     .first()
+                     .map(|seg| seg.vertical_pos);
+                 let removed = cell.paragraphs.remove(cell_para_idx);
+-                removed_meta = Some(removed.capture_meta());
+-                let prev = &mut cell.paragraphs[prev_idx];
+-                merge_point = prev.text.chars().count();
+-                prev.merge_from(&removed);
++                let (offset, meta) = merge_cell_paragraph_with_format(
++                    &mut cell.paragraphs[prev_idx],
++                    &removed,
++                    para_shapes,
++                );
++                merge_point = offset;
++                removed_meta = Some(meta);
+                 break;
+             }
+             para = cell
+--- a/src/model/paragraph.rs
++++ b/src/model/paragraph.rs
+@@ -241,6 +241,16 @@
+     pub raw_header_extra: Vec<u8>,
+     /// TAB 확장 데이터 — 문단 전체가 통째로 이동하므로 분할 없이 그대로 옮긴다.
+     pub tab_extended: Vec<[u16; 7]>,
++    /// Undo data for deleting an empty cell paragraph before formatted body text.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub empty_prefix_format: Option<EmptyPrefixFormat>,
++}
++
++#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
++pub struct EmptyPrefixFormat {
++    pub para_shape_id: u16,
++    pub style_id: u8,
++    pub char_shapes: Vec<(u32, u32)>,
+ }
+ 
+ /// 문단 번호 시작 방식
+@@ -1467,6 +1477,7 @@
+             numbering_restart: self.numbering_restart,
+             raw_header_extra: self.raw_header_extra.clone(),
+             tab_extended: self.tab_extended.clone(),
++            empty_prefix_format: None,
+         }
+     }
+ 

@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),asse
 const root=__dirname,report={version:'1.0.11',nativePackaged:true,cases:[]};let app,current;
 const bundle=path.join(root,'stage/resources/modules/hwp/renderer/studio/assets/index-Bk_t2nzj.js'),original=fs.readFileSync(bundle);
 // Read-only inspection. The production bundle is restored before payload verification.
-const probe=`\nwindow.__electimesCellFlow=()=>{const d=z.doc;if(!d)return null;const cell=(index)=>Array.from({length:d.getCellParagraphCount(0,0,2,index)},(_,p)=>{const n=d.getCellParagraphLength(0,0,2,index,p),path=JSON.stringify([{controlIndex:2,cellIndex:index,cellParaIndex:p}]);return{text:d.getTextInCell(0,0,2,index,p,0,n),first:JSON.parse(d.getCursorRectByPath(0,0,path,0)),last:JSON.parse(d.getCursorRectByPath(0,0,path,n))}});return{position:U?.cursor.getPosition(),selection:U?.cursor.getSelectionOrdered(),info:JSON.parse(d.getPageInfo(0)),source:cell(0),target:cell(1)}};\n`;
+const probe=`\nwindow.__electimesCellFlow=()=>{const d=z.doc;if(!d)return null;const cell=(index)=>Array.from({length:d.getCellParagraphCount(0,0,2,index)},(_,p)=>{const n=d.getCellParagraphLength(0,0,2,index,p),path=JSON.stringify([{controlIndex:2,cellIndex:index,cellParaIndex:p}]);return{props:JSON.parse(d.getCellParaPropertiesAt(0,0,2,index,p)),text:d.getTextInCell(0,0,2,index,p,0,n),first:JSON.parse(d.getCursorRectByPath(0,0,path,0)),last:JSON.parse(d.getCursorRectByPath(0,0,path,n))}});return{position:U?.cursor.getPosition(),selection:U?.cursor.getSelectionOrdered(),info:JSON.parse(d.getPageInfo(0)),source:cell(0),target:cell(1)}};\n`;
 if(!original.toString().includes('window.rhwpStudio={notifySaved:a=>Zw(a),fonts:'))throw Error('Unexpected editor diagnostic anchor');
 fs.writeFileSync(bundle,Buffer.concat([original,Buffer.from(probe)]));
 async function until(fn,label,ms=45000){const end=Date.now()+ms;while(Date.now()<end){const v=await fn();if(v)return v;await new Promise(r=>setTimeout(r,100));}throw Error('Timed out: '+label);}
@@ -58,6 +58,18 @@ function check(state,label){
     await page.keyboard.press('Control+y');await until(async()=>((await read()).target[0].text.length>before.target[0].text.length),'redo paste');
     entry.redo=await read();check(entry.redo,'redo');
     await page.screenshot({path:path.join(root,`cell-flow-${mode}-windows.png`)});
+    await page.keyboard.press('Control+z');
+    await until(async()=>JSON.stringify((await read()).target.map(p=>p.text))===JSON.stringify(before.target.map(p=>p.text)),'restore baseline before blank deletion');
+    await frame.locator('#scroll-container').evaluate(e=>{e.scrollTop=0;});
+    const clean=await read(),freshCanvas=await frame.locator('.document-page-canvas').first().boundingBox(),body=clean.target[2].first;
+    await page.mouse.click(freshCanvas.x+(body.x+0.6)*scale,freshCanvas.y+(body.y+body.height/2)*scale);await page.keyboard.press('Home');
+    await page.keyboard.press('Backspace');await until(async()=>((await read()).target.length===before.target.length-1),'blank line removed');
+    entry.blankRemoved=await read();check(entry.blankRemoved,'blank deletion');
+    assert.equal(entry.blankRemoved.target[1].props.lineSpacing,160,'Body spacing survives deleting the 100% blank');
+    assert.equal(entry.blankRemoved.target[1].text,before.target[2].text);
+    await page.keyboard.press('Control+z');await until(async()=>((await read()).target.length===before.target.length),'undo restores blank');
+    const blankUndo=await read();assert.equal(blankUndo.target[1].props.lineSpacing,100);assert.equal(blankUndo.target[2].props.lineSpacing,160);
+    entry.blankSpacingUndo=true;
     entry.keyboardPaste=true;entry.undoRedo=true;entry.noOverlap=true;
     await home.locator('.tab-close').last().click();await page.waitForEvent('close',{timeout:5000}).catch(()=>{});
   }

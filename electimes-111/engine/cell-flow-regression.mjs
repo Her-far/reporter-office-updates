@@ -95,6 +95,32 @@ for(const kind of ['flat','path','nested'])for(const end of [0,2]){
     report.cases.push({name,textPreserved:true,spaceReclaimed:true});
   }catch(e){report.failures.push({name,error:String(e)});}finally{d.free();}
 }
+for(const kind of ['flat','path','nested']){
+  const name=`${kind}/delete-blank-preserves-body-format`;
+  const d=new api.HwpDocument(Buffer.from(fs.readFileSync(path.join(root,`cell-flow-${kind==='nested'?'nested':'flat'}.hwp.b64`),'utf8'),'base64')),c=context(kind);
+  try{
+    const before=layout(d,c),span=p=>p.end.y-p.start.y;
+    const merged=JSON.parse(invoke(d,c,kind,'mergeParagraph',2));
+    const after=noOverlap(d,c,name);
+    assert.equal(after[1].text,before[2].text);
+    assert(Math.abs(span(after[1])-span(before[2]))<0.2,'Deleting a blank line must retain the body line spacing');
+    assert(merged.removedParaMeta.empty_prefix_format,'Undo must remember the blank line formatting');
+    if(kind!=='nested')assert.equal(JSON.parse(d.getCellParaPropertiesAt(0,0,2,1,1)).lineSpacing,160);
+    invoke(d,c,kind,'splitParagraph',1,0,JSON.stringify(merged.removedParaMeta));
+    const undone=layout(d,c);
+    assert.deepEqual(undone.map(p=>p.text),before.map(p=>p.text));
+    for(let i=0;i<before.length;i++)assert(Math.abs(span(undone[i])-span(before[i]))<0.2,'Undo restores each paragraph spacing');
+    if(kind!=='nested'){
+      assert.equal(JSON.parse(d.getCellParaPropertiesAt(0,0,2,1,1)).lineSpacing,100);
+      assert.equal(JSON.parse(d.getCellParaPropertiesAt(0,0,2,1,2)).lineSpacing,160);
+    }
+    invoke(d,c,kind,'mergeParagraph',2);
+    assert(Math.abs(span(layout(d,c)[1])-span(before[2]))<0.2,'Redo retains body spacing');
+    const reopened=new api.HwpDocument(d.exportHwp());
+    assert(Math.abs(span(layout(reopened,c)[1])-span(before[2]))<0.2,'Saved merge retains body spacing');reopened.free();
+    report.cases.push({name,bodySpacingPreserved:true,blankFormattingUndo:true,redo:true,saveReopen:true});
+  }catch(e){report.failures.push({name,error:String(e)});}finally{d.free();}
+}
 {
   const name='stored-frame-reset';
   const d=new api.HwpDocument(Buffer.from(fs.readFileSync(path.join(root,'cell-flow-reset.hwpx.b64'),'utf8'),'base64'));

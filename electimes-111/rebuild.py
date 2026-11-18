@@ -24,7 +24,7 @@ subprocess.run([os.environ['MAKENSIS'],flag+'V2',flag+'DWORK='+str(package),flag
 check=root/'installer-check';subprocess.run([seven,'x',str(output),'-o'+str(check),'-y'],check=True,stdout=subprocess.DEVNULL)
 assert all((check/p).is_file() and sha(check/p)==digest for p,digest in manifest.items()),'Installer content mismatch'
 entry={'url':'https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.11/'+output.name,'size':output.stat().st_size,'sha256':sha(output)}
-feed={'product':'electimes-office','platform':'win32-x64','version':'1.0.11','build':111,'minBuild':103,'maxBuild':110,'notes':['HWP 표 안에서 긴 글을 붙여넣은 뒤 아래 문단과 겹치는 문제를 수정했습니다.','잘라내기·범위 삭제 후 남은 문단의 위치를 다시 계산합니다.','중첩 표의 서식 있는 붙여넣기에도 같은 수정을 적용했습니다.','기존 문단 서식과 1.0.10 패널 수정을 유지합니다.'],'installer':entry,'fullInstaller':entry}
+feed={'product':'electimes-office','platform':'win32-x64','version':'1.0.11','build':111,'minBuild':103,'maxBuild':110,'notes':['HWP 표 안에서 긴 글을 붙여넣은 뒤 아래 문단과 겹치는 문제를 수정했습니다.','잘라내기·범위 삭제 후 남은 문단의 위치를 다시 계산합니다.','중첩 표의 서식 있는 붙여넣기에도 같은 수정을 적용했습니다.','빈 줄 삭제 시 본문 줄 간격을 유지하고 실행 취소 시 원래 서식을 복원합니다.','1.0.10 패널 수정을 유지합니다.'],'installer':entry,'fullInstaller':entry}
 (root/'electimes-latest.json').write_text(json.dumps(feed,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 (root/'ElectimesOffice-SHA256SUMS-1.0.11.txt').write_text(f'{sha(output)}  {output.name}\n')
 print(json.dumps({'version':'1.0.11','payloadFilesVerified':len(manifest),'installer':entry}))
