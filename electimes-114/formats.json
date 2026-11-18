@@ -1,0 +1,8 @@
+{
+  "doc": "docx", "docx": "docx", "odt": "docx",
+  "xlsx": "xlsx", "xlsm": "xlsx", "xls": "xlsx",
+  "csv": "csv", "tsv": "tsv", "pptx": "pptx",
+  "hwp": "hwp", "hwpx": "hwp", "pdf": "pdf",
+  "md": "md", "markdown": "md", "txt": "txt", "json": "json",
+  "html": "html", "htm": "html", "xmind": "xmind", "epub": "epub"
+}

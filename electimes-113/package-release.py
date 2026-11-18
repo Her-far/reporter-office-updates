@@ -1,5 +1,5 @@
-"""Build the Windows setup, cumulative updater and candidate feed for 1.0.13.
-Arguments: extracted 1.0.12, production stage, published 1.0.12 cumulative EXE, new output directory.
+"""Build the Windows setup, cumulative updater and candidate feed for the staged release.
+Arguments: extracted prior release, production stage, prior cumulative EXE, new output directory.
 """
 import hashlib
 import json
@@ -37,10 +37,24 @@ def dump(path, obj):
 def metadata(directory):
     return json.loads((directory/'resources/electimes-version.json').read_text('utf-8'))
 
-assert (old_feed['minBuild'],old_feed['maxBuild'],old_feed['build']) == (106,111,112)
-assert sha(previous_patch) == old_feed['installer']['sha256'] == 'aaf4b308492a41eb4b39b4c53daf86b832528e462feae06498113fbcfb8130fa'
-assert metadata(base) == {'version':'1.0.12','build':112}
-assert metadata(stage) == {'version':version,'build':113}
+new_build = metadata(stage)['build']
+if new_build == 114:
+    import re
+    version = '1.0.14'
+    notes = ['홈 화면과 Windows 탐색기에 파일 형식별 색띠와 전기신문 로고를 적용했습니다.',
+             '최근 문서 필터에서 한글을 전체 다음에 배치했습니다.',
+             '웹 AI를 포함하며 1.0.6~1.0.13에서 누적 패치로 업데이트할 수 있습니다.']
+    assert metadata(base) == {'version':'1.0.13','build':113}
+    assert sha(previous_patch) == '2e189bff211189aa245f078bd715fc46a9c5611ef96982a2a16505bdc03b575c'
+else:
+    assert (old_feed['minBuild'],old_feed['maxBuild'],old_feed['build']) == (106,111,112)
+    assert sha(previous_patch) == old_feed['installer']['sha256'] == 'aaf4b308492a41eb4b39b4c53daf86b832528e462feae06498113fbcfb8130fa'
+    assert metadata(base) == {'version':'1.0.12','build':112}
+    assert new_build == 113
+assert metadata(stage) == {'version':version,'build':new_build}
+previous_version = metadata(base)['version']
+minimum_version = '1.0.6'
+supported = minimum_version+'~'+previous_version
 expected = manifest(stage)
 previous = manifest(base)
 delta = {name for name in expected if expected[name] != previous.get(name)}
@@ -62,13 +76,25 @@ with TemporaryDirectory(dir=output.parent) as tmp:
     for n in ['electimes-office.ico','welcome.bmp','header.bmp']:
         shutil.copy2(repo/'electimes-104'/n,brand/n)
     prior = repo/'electimes-109'
-    shutil.copy2(prior/'associations-109.nsh', work)
+    associations = (prior/'associations-109.nsh').read_text('utf-8-sig')
+    if new_build == 114:
+        families = json.loads((repo/'electimes-114/formats.json').read_text())
+        pairs = re.findall(r'FileAssociations" "\.([a-z0-9]+)" "(ElectimesOffice\.\w+)"',associations)
+        assert set(dict(pairs)) == set(families)
+        for ext, prog in pairs:
+            before = 'Software\\Classes\\'+prog+'\\DefaultIcon" "" '
+            icon = 'resources\\file-icons\\'+families[ext]+'.ico'
+            assert (stage/icon.replace('\\','/')).is_file()
+            lines = associations.splitlines(keepends=True)
+            assert any(before in line for line in lines)
+            associations = ''.join(line.replace('Electimes Office.exe',icon) if before in line else line for line in lines)
+    (work/'associations-109.nsh').write_text(associations,encoding='utf-8-sig')
     subprocess.run([sys.executable, str(prior/'workpanel/build/uninstall-manifest.py'),
                     str(stage), str(work/'uninstall-files-109.nsh')],check=True)
     script = (prior/'setup-109.nsi').read_text('utf-8-sig').replace('1.0.9',version)
     start = script.index('!ifdef PATCH\nIfFileExists')
     end = script.index('!endif\n!insertmacro CheckBusy',start)
-    accepted = [{'version':'1.0.'+str(i), 'build':100+i} for i in range(6,14)]
+    accepted = [{'version':'1.0.'+str(i), 'build':100+i} for i in range(6,new_build-100+1)]
     guard = r'''!ifdef PATCH
 IfFileExists "$INSTDIR\Electimes Office.exe" 0 wrong_base
 IfFileExists "$INSTDIR\resources\app.asar" 0 wrong_base
@@ -78,9 +104,9 @@ FileRead $0 $1
 FileClose $0
 '''
     guard += '\n'.join("StrCmp $1 '"+json.dumps(v,separators=(',',':'))+"' base_ok" for v in accepted)
-    guard += '\nwrong_base:\nIfSilent +2\nMessageBox MB_OK|MB_ICONEXCLAMATION "전기신문 Office 1.0.6~1.0.12 정식판 설치 폴더를 선택하세요."\nSetErrorLevel 4\nAbort\nbase_ok:\n'
+    guard += '\nwrong_base:\nIfSilent +2\nMessageBox MB_OK|MB_ICONEXCLAMATION "전기신문 Office '+supported+' 정식판 설치 폴더를 선택하세요."\nSetErrorLevel 4\nAbort\nbase_ok:\n'
     script = script[:start] + guard + script[end:]
-    script = script.replace('1.0.3~1.0.5','1.0.6~1.0.12')
+    script = script.replace('1.0.3~1.0.5',supported)
     script = script.replace('WriteUninstaller "$INSTDIR\\Uninstall.exe"\n','')
     script = script.replace('!insertmacro RegisterCompany\n','!insertmacro RegisterCompany\nWriteUninstaller "$INSTDIR\\Uninstall.exe"\n')
     if os.name=='nt':
@@ -100,7 +126,7 @@ FileClose $0
         entries[kind]={'url':f'https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v{version}/{exe.name}',
                        'size':exe.stat().st_size,'sha256':sha(exe)}
         print(kind,len(names),'files',exe.stat().st_size,'bytes verified',flush=True)
-feed={'product':'electimes-office','platform':'win32-x64','version':version,'build':113,
-      'minBuild':106,'maxBuild':112,'notes':notes,'installer':entries['Update'],'fullInstaller':entries['Setup']}
+feed={'product':'electimes-office','platform':'win32-x64','version':version,'build':new_build,
+      'minBuild':106,'maxBuild':new_build-1,'notes':notes,'installer':entries['Update'],'fullInstaller':entries['Setup']}
 dump(output/'electimes-latest.json',feed)
 (output/f'ElectimesOffice-SHA256SUMS-{version}.txt').write_text(''.join(e['sha256']+'  '+e['url'].split('/')[-1]+'\n' for e in entries.values()),encoding='utf-8')
