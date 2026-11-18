@@ -23,13 +23,13 @@ assert 'ElectimesOffice-AIWeb-Test.exe' not in changed
 assert not any(p.endswith('.wasm') for p in changed)
 artifacts=[]
 for kind,payload in [('Compact',compact),('Full',stage)]:
- exe=dist/f'ElectimesOffice-AIWeb-Test-1.0.12.1-{kind}-Setup.exe'
+ exe=dist/f'ElectimesOffice-AIWeb-Test-1.0.12.2-{kind}-Setup.exe'
  args=[os.environ['MAKENSIS'],'/V2','/DPACKAGE='+str(package),'/DPAYLOAD='+str(payload),'/DOUTPUT='+str(exe)]
  if kind=='Compact':args+=['/DCOMPACT']
  subprocess.run(args+[str(root/'setup.nsi')],check=True)
  artifacts.append({'name':exe.name,'size':exe.stat().st_size,'sha256':sha(exe)})
 assert artifacts[0]['size']<30*1024*1024
 (dist/'SHA256SUMS.txt').write_text(''.join(x['sha256']+'  '+x['name']+'\n' for x in artifacts))
-(dist/'package-windows.json').write_text(json.dumps({'version':'1.0.12-aiweb.1','files':len(target),'compactFiles':changed,'artifacts':artifacts},indent=2))
+(dist/'package-windows.json').write_text(json.dumps({'version':'1.0.12-aiweb.2','files':len(target),'compactFiles':changed,'artifacts':artifacts},indent=2))
 shutil.copy2(stage/'BUILD-VERIFICATION.json',dist/'BUILD-VERIFICATION.json')
 print(json.dumps(artifacts),flush=True)

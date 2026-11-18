@@ -1,4 +1,4 @@
-name: Build isolated Office AI web test
+name: Build isolated Office subscription panel test
 on:
   push:
     branches: [test/electimes-ai-web-20261118]
@@ -26,7 +26,7 @@ jobs:
         run: |
           choco install nsis --yes --no-progress
           if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
-          npm install --no-save --ignore-scripts playwright@1.62.1
+          npm ci --ignore-scripts --no-audit --no-fund
           if ($LASTEXITCODE -ne 0) { throw 'Test tool installation failed' }
       - name: Verify published baseline and build separate test edition
         run: |
@@ -35,12 +35,12 @@ jobs:
           if ((Get-FileHash base.exe -Algorithm SHA256).Hash.ToLowerInvariant() -ne '8060e3e6e89bf33aed3d3a99fa00d1ea8e85cba22d42c3bc6693b47a38604431') { throw 'Incorrect baseline' }
           & 'C:\Program Files\7-Zip\7z.exe' x base.exe -obase -y | Out-Null
           if ($LASTEXITCODE -ne 0) { throw 'Extraction failed' }
-          node --test policy.test.cjs
+          node --test plan.test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Provider boundary tests failed' }
           node build.cjs base stage
           if ($LASTEXITCODE -ne 0) { throw 'Test edition build failed' }
       - name: Exercise packaged Windows AI panel
-        timeout-minutes: 8
+        timeout-minutes: 16
         run: |
           node ui-test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'AI panel verification failed' }

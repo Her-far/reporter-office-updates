@@ -1,0 +1,16 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'none'"><title>AI 구독 대화</title><link rel="stylesheet" href="xterm.css"><link rel="stylesheet" href="plan-panel.css"></head><body>
+<p id="error" role="status" hidden></p>
+<section id="chatgpt">
+ <div id="connect"><h2>구독 계정으로 대화하기</h2><p>브라우저에서 ChatGPT에 로그인하면 이 패널로 연결됩니다. 지원되는 구독의 사용 한도가 적용됩니다.</p><button id="login">Continue with ChatGPT</button><button id="cancel-login" hidden>로그인 취소</button><p class="muted">이곳의 대화는 ChatGPT 웹 대화 목록과 별도로 이 PC에 저장됩니다.</p></div>
+ <div id="account-tools" class="row"><select id="accounts" aria-label="ChatGPT 계정"></select><button id="add-account">계정 추가</button><button id="reauth">다시 연결</button><button id="logout">연결 해제</button></div>
+ <div id="welcome" hidden><strong>ChatGPT 구독을 사용합니다.</strong><p>이 패널의 요청은 ChatGPT 구독 한도 또는 연결된 크레딧 잔액을 사용합니다. 사용량은 ChatGPT 설정에서 관리할 수 있습니다.</p><button id="acknowledge">확인</button></div>
+ <div id="chat-tools" class="row"><select id="threads" aria-label="저장된 대화"></select><button id="new">새 대화</button><button id="delete-thread">삭제</button></div>
+ <div id="messages" aria-live="polite"></div>
+ <div id="composer"><div class="row"><select id="models" aria-label="모델"></select><button id="models-refresh" title="모델 목록 새로고침">↻</button><label><input id="search" type="checkbox"> 웹 검색</label></div><textarea id="prompt" rows="3" placeholder="질문을 입력하세요. Shift+Enter로 줄 바꿈" maxlength="80000"></textarea><div class="row"><span id="plan-label">ChatGPT 구독 사용</span><button id="usage">사용량 관리</button><button id="stop" hidden>중지</button><button id="send" class="primary">보내기</button></div><small>문서 내용은 자동으로 전송되지 않습니다.</small></div>
+</section>
+<section id="official" hidden><div id="official-intro"><h2 id="official-name"></h2><p id="official-description"></p><div class="row"><button id="install">공식 프로그램 설치</button><button id="start" class="primary">시작</button><button id="end">종료</button></div><p id="official-notice" role="status"></p><details><summary>처음 사용하는 방법</summary><p>아래 화면을 클릭하고 화살표·Enter로 초기 설정을 선택하세요. 구독 계정으로 로그인을 선택하면 브라우저가 열립니다. 로그인 후 이 패널로 돌아오면 됩니다.</p><p>공식 프로그램 자체 화면입니다. 설정과 대화 기록은 해당 프로그램에서 관리하며, 웹사이트의 이전 대화는 불러오지 않습니다. API 계정이나 별도 결제를 직접 선택하면 별도 요금이 적용될 수 있습니다.</p><p>처음 설치할 때만 공식 프로그램을 다운로드합니다. 사용 중인 문서 대신 별도의 빈 작업 폴더에서 시작합니다. 파일 작업 권한은 공식 프로그램의 확인 창에서 선택하세요.</p></details></div>
+ <div id="terminals"><div id="terminal-claude" class="terminal"></div><div id="terminal-gemini" class="terminal"></div></div>
+ <div class="row terminal-tools"><button id="term-copy">선택한 답변 복사</button><button id="term-paste">붙여넣기</button><button id="term-enter">Enter</button><button id="term-escape">Esc</button></div>
+ <div class="terminal-compose"><textarea id="terminal-input" rows="2" placeholder="긴 질문을 여기에 작성한 뒤 입력칸에 넣을 수 있습니다." maxlength="60000"></textarea><button id="term-insert">입력칸에 넣기</button></div>
+</section>
+<script src="xterm.js"></script><script src="addon-fit.js"></script><script src="plan-panel.js"></script></body></html>

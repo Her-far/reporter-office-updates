@@ -20,7 +20,7 @@ try{
  $prodProfile=Join-Path $env:APPDATA 'Electimes Office'
  New-Item -ItemType Directory $prodProfile -Force|Out-Null
  $prodMarker=Join-Path $prodProfile 'ai-web-test-preservation.txt';[IO.File]::WriteAllText($prodMarker,'production profile remains untouched')
- $compact="$root/dist/ElectimesOffice-AIWeb-Test-1.0.12.1-Compact-Setup.exe"
+ $compact="$root/dist/ElectimesOffice-AIWeb-Test-1.0.12.2-Compact-Setup.exe"
  $resource=Join-Path $prod 'resources/electimes-version.json';$original=[IO.File]::ReadAllBytes($resource)
  [IO.File]::WriteAllText($resource,'{"version":"wrong"}')
  Install $compact $target 4
@@ -44,7 +44,7 @@ try{
  if([IO.File]::ReadAllText((Join-Path $target '사용자 문서 보존.txt')) -ne 'keep user file'){throw 'User document removed'}
  if(Test-Path (Join-Path $target 'ElectimesOffice-AIWeb-Test.exe')){throw 'Test executable left behind'}
  Verify $prod $base;$report.uninstallPreservesUserFiles=$true
- Install "$root/dist/ElectimesOffice-AIWeb-Test-1.0.12.1-Full-Setup.exe" $fullTarget
+ Install "$root/dist/ElectimesOffice-AIWeb-Test-1.0.12.2-Full-Setup.exe" $fullTarget
  Verify $fullTarget $manifest;$report.full=$true
  # Both applications must be able to run concurrently with distinct profiles.
  $production=Start-Process -FilePath (Join-Path $prod 'Electimes Office.exe') -PassThru

@@ -1,90 +1,52 @@
 'use strict';
-// Remote services never receive an Office preload, Node, document data or IPC.
-const {WebContentsView,session,shell,dialog,Menu,clipboard}=require('electron');
-const {providers,https,allowed,googleLogin}=require('./ai-web-policy.cjs');
-const remote=new WeakSet();
+const {app,WebContentsView,ipcMain,net,shell,clipboard,Menu}=require('electron');
+const path=require('node:path');const {PlanAuth}=require('./plan-auth.cjs'),{PlanChat}=require('./plan-chat.cjs'),{OfficialCLI}=require('./official-cli.cjs');
 function create(deps){
- const views=new Map(),popups=new Set(),configuredSessions=new WeakSet();let selected='chatgpt',visible=false,closed=false,externalPrompt=false;
- const state=()=>{const item=views.get(selected);return {provider:selected,loading:!!item?.loading,error:item?.error||'',canBack:!!item?.view.webContents.navigationHistory.canGoBack(),canForward:!!item?.view.webContents.navigationHistory.canGoForward()};};
- const changed=()=>{if(!closed)deps.changed();};
- function notice(item,message){item.error=message;changed();}
- function hide(){visible=false;for(const item of views.values()){item.view.setVisible(false);if(!item.view.webContents.isDestroyed())item.view.webContents.setAudioMuted(true);}}
- async function offerExternal(url,item){
-  if(externalPrompt||!https(url))return;externalPrompt=true;
-  try{
-   const response=await dialog.showMessageBox(deps.window(),{type:'question',buttons:['취소','브라우저에서 열기'],defaultId:1,cancelId:0,message:'외부 브라우저에서 열까요?',detail:googleLogin(url)?'Google 로그인은 내장 화면에서 지원하지 않습니다. 기본 브라우저에서 이 AI 서비스를 이용할 수 있습니다. 두 창의 로그인은 별도로 유지됩니다.':new URL(url).hostname});
-   if(response.response===1)await shell.openExternal(googleLogin(url)?providers[item.id].url:url);
-  }finally{externalPrompt=false;}
+ let view=null,selected='chatgpt',visible=false,closed=false,error='',emitTimer=null;
+ const runtime=path.join(process.resourcesPath,'ai-runtime/node_modules');
+ const auth=new PlanAuth({vault:deps.vault,initialized:app.whenReady(),fetch:(...args)=>net.fetch(...args),openExternal:u=>shell.openExternal(u),jose:require(path.join(runtime,'jose')),changed:emit});
+ const chat=new PlanChat({auth,vault:deps.vault,fetch:(...args)=>net.fetch(...args),changed:emit});
+ const cli=new OfficialCLI({root:path.join(app.getPath('userData'),'subscription-panel'),fetch:(...args)=>net.fetch(...args),pty:require(path.join(runtime,'node-pty')),changed:emit,event:e=>{if(view&&!view.webContents.isDestroyed())view.webContents.send('plan:terminal',e);}});
+ const ready=Promise.all([auth.ready,chat.ready]).then(()=>{if(auth.current()?.access)void auth.models().catch(e=>{error=e.message;emit();});}).catch(e=>{error=e.message;});
+ function state(){return {provider:selected,error,auth:auth.state(),chat:chat.state(),cli:selected==='chatgpt'?null:cli.state(selected)};}
+ function emit(){if(closed||emitTimer)return;emitTimer=setTimeout(()=>{emitTimer=null;if(view&&!view.webContents.isDestroyed())view.webContents.send('plan:state',state());},60);}
+ function trusted(e){return !!view&&e.sender===view.webContents&&e.senderFrame===view.webContents.mainFrame;}
+ async function action(p){await ready;error='';const a=p?.action,x=p?.value;
+  if(a==='state')return state();
+  if(a==='login'){if(chat.abort)throw Error('답변을 중지한 뒤 연결해 주세요.');await auth.start(x?.id||undefined,{consent:x?.consent===true});}
+  else if(a==='cancel-login')auth.cancel();
+  else if(a==='logout'){chat.stop();await auth.logout();}
+  else if(a==='account'){if(chat.abort)throw Error('답변을 중지한 뒤 계정을 바꿔 주세요.');await auth.select(x);}
+  else if(a==='acknowledge')await auth.acknowledge();
+  else if(a==='models')await auth.models();
+  else if(a==='send'){if(selected!=='chatgpt')throw Error('서비스를 확인해 주세요.');void chat.send(x).catch(e=>{error=e.message;emit();});}
+  else if(a==='stop')chat.stop();
+  else if(a==='new')await chat.newThread();
+  else if(a==='thread')await chat.select(x);
+  else if(a==='delete-thread')await chat.remove();
+  else if(a==='usage')await shell.openExternal('https://chatgpt.com/');
+  else if(a==='copy'){if(typeof x!=='string'||x.length>500000)throw Error('복사할 내용을 확인해 주세요.');clipboard.writeText(x);}
+  else if(a==='source'){const u=new URL(x);if(u.protocol!=='https:'||u.username||u.password)throw Error('지원하지 않는 링크입니다.');await shell.openExternal(u.href);}
+  else if(a==='cli-install'){if(selected==='chatgpt')return;void cli.install(selected).catch(e=>{error=e.message;emit();});}
+  else if(a==='cli-start'){if(selected==='chatgpt')return;cli.start(selected,x?.cols,x?.rows);}
+  else if(a==='cli-stop'){if(selected!=='chatgpt')cli.stop(selected);}
+  else if(a==='paste-document'){const owner=deps.owner();if(!deps.isDocument(owner))throw Error('문서 탭을 열고 붙여넣을 위치를 선택해 주세요.');if(typeof x==='string'&&x.length<=500000)clipboard.writeText(x);if(!clipboard.readText())throw Error('먼저 답변을 복사해 주세요.');owner.focus();owner.pasteAndMatchStyle();}
+  emit();return state();
  }
- function blocked(url,item){
-  if(googleLogin(url)){notice(item,'Google 로그인은 ‘브라우저에서 열기’를 이용해 주세요.');return;}
-  if(https(url))void offerExternal(url,item).catch(()=>notice(item,'외부 브라우저를 열지 못했습니다.'));
- }
- function secure(wc,item){
-  remote.add(wc);
-  wc.on('will-attach-webview',e=>e.preventDefault());
-  for(const eventName of ['will-navigate','will-redirect'])wc.on(eventName,(e,url,_sameDocument,isMainFrame)=>{if(isMainFrame===false||allowed(item.id,url))return;e.preventDefault();blocked(url,item);});
-  wc.setWindowOpenHandler(({url})=>{
-   if(url==='about:blank'||allowed(item.id,url))return {action:'allow',overrideBrowserWindowOptions:{parent:deps.window(),width:1050,height:780,autoHideMenuBar:true,webPreferences:{session:item.session,nodeIntegration:false,nodeIntegrationInWorker:false,contextIsolation:true,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,preload:undefined}}};
-   blocked(url,item);return {action:'deny'};
-  });
-  wc.on('did-create-window',win=>{popups.add(win);secure(win.webContents,item);win.on('closed',()=>popups.delete(win));});
+ ipcMain.handle('plan:action',async(e,p)=>{if(!trusted(e))throw Error('forbidden');try{return {ok:true,state:await action(p)};}catch(e){error=e.message||'요청을 처리하지 못했습니다.';emit();return {ok:false,error};}});
+ ipcMain.on('plan:input',(e,p)=>{if(!trusted(e)||!visible||p?.provider!==selected||selected==='chatgpt')return;try{cli.input(selected,p.data);}catch{}});
+ ipcMain.on('plan:resize',(e,p)=>{if(!trusted(e)||!['claude','gemini'].includes(p?.provider))return;cli.resize(p.provider,p.cols,p.rows);});
+ function ensure(){if(view&&!view.webContents.isDestroyed())return;view=new WebContentsView({webPreferences:{preload:path.join(__dirname,'plan-preload.cjs'),nodeIntegration:false,contextIsolation:true,sandbox:true,webSecurity:true,spellcheck:true,partition:'office-subscription-local'}});
+  const wc=view.webContents;wc.setWindowOpenHandler(()=>({action:'deny'}));wc.on('will-navigate',e=>e.preventDefault());wc.on('will-attach-webview',e=>e.preventDefault());wc.on('did-finish-load',emit);
   wc.on('before-input-event',(e,input)=>{if(visible&&input.type==='keyDown'&&input.key==='Escape'&&!input.isComposing&&deps.expanded()){e.preventDefault();deps.restore();}});
-  wc.on('context-menu',(_event,params)=>{
-   const items=[{role:'copy',enabled:!!params.selectionText},{role:'paste',enabled:params.isEditable},{role:'selectAll'}];
-   if(https(params.linkURL))items.push({type:'separator'},{label:'링크를 브라우저에서 열기',click:()=>offerExternal(params.linkURL,item)});
-   Menu.buildFromTemplate(items).popup({window:deps.window()});
-  });
+  wc.on('context-menu',(_e,p)=>Menu.buildFromTemplate([{role:'copy',enabled:!!p.selectionText},{role:'paste',enabled:p.isEditable},{role:'selectAll'}]).popup({window:deps.window()}));
+  wc.on('render-process-gone',()=>{cli.close();view=null;error='대화 화면이 종료됐습니다. 패널을 다시 열어 주세요.';});
+  view.setVisible(false);void wc.loadFile(path.join(__dirname,'plan-panel.html')).catch(e=>{error=e.message;emit();});
  }
- function ensure(id){
-  let item=views.get(id);if(item&&!item.view.webContents.isDestroyed())return item;
-  const ses=session.fromPartition('persist:electimes-ai-web-test-'+id);
-  // Ordinary explicit Ctrl+V works without granting background clipboard reads.
-  ses.setPermissionCheckHandler((_wc,permission,origin)=>permission==='clipboard-sanitized-write'&&allowed(id,origin));
-  ses.setPermissionRequestHandler((wc,permission,callback)=>callback(permission==='clipboard-sanitized-write'&&!!wc&&allowed(id,wc.getURL())));
-  ses.setDevicePermissionHandler(()=>false);
-  if(!configuredSessions.has(ses))ses.on('will-download',(_event,download)=>{
-   download.setSaveDialogOptions({title:'AI 첨부파일 저장',defaultPath:require('node:path').join(require('electron').app.getPath('downloads'),require('./policy.cjs').safeFilename(download.getFilename()))});
-  });
-  configuredSessions.add(ses);
-  // Stop Google authentication before it enters an embedded user-agent. This
-  // does not spoof the browser, remove security headers or transfer cookies.
-  ses.webRequest.onBeforeRequest({urls:['https://accounts.google.com/*']},(details,callback)=>{
-   if(details.resourceType==='mainFrame'||details.resourceType==='subFrame'){callback({cancel:true});if(item)notice(item,'Google 로그인은 ‘브라우저에서 열기’를 이용해 주세요.');}else callback({});
-  });
-  const view=new WebContentsView({webPreferences:{session:ses,nodeIntegration:false,nodeIntegrationInWorker:false,contextIsolation:true,sandbox:true,webSecurity:true,allowRunningInsecureContent:false,backgroundThrottling:true,spellcheck:true}});
-  item={id,view,session:ses,loading:true,error:''};views.set(id,item);secure(view.webContents,item);view.setVisible(false);
-  const wc=view.webContents;
-  wc.on('did-start-loading',()=>{item.loading=true;changed();});
-  wc.on('did-stop-loading',()=>{item.loading=false;changed();});
-  wc.on('did-navigate',changed);wc.on('did-navigate-in-page',changed);
-  wc.on('did-fail-load',(_e,code,_description,_url,main)=>{if(main&&code!==-3)notice(item,'화면을 불러오지 못했습니다. 새로고침하거나 브라우저에서 열어 주세요.');});
-  wc.on('render-process-gone',()=>notice(item,'웹 화면이 종료됐습니다. 새로고침해 주세요.'));
-  void wc.loadURL(providers[id].url).catch(()=>{});
-  return item;
- }
- function show(id,bounds){if(closed)return;selected=Object.hasOwn(providers,id)?id:'chatgpt';hide();const item=ensure(selected),win=deps.window();win.contentView.addChildView(item.view);item.view.setBounds(bounds);item.view.setVisible(true);item.view.webContents.setAudioMuted(false);visible=true;}
- async function command(action,owner){
-  const item=ensure(selected),wc=item.view.webContents;
-  if(action==='external'){const url=wc.getURL();await shell.openExternal(https(url)?.hostname===new URL(providers[selected].url).hostname?url:providers[selected].url);}
-  else if(action==='new'){item.error='';await wc.loadURL(providers[selected].url);}
-  else if(action==='reload'){item.error='';wc.reload();}
-  else if(action==='back'&&wc.navigationHistory.canGoBack())wc.navigationHistory.goBack();
-  else if(action==='forward'&&wc.navigationHistory.canGoForward())wc.navigationHistory.goForward();
-  else if(action==='paste-ai'){wc.focus();wc.pasteAndMatchStyle();}
-  else if(action==='paste-document'){
-   if(!deps.isDocument(owner)){notice(item,'문서 탭을 열고 붙여넣을 위치를 먼저 선택해 주세요.');return;}
-   if(!clipboard.readText()){notice(item,'먼저 AI 답변을 복사해 주세요.');return;}
-   owner.focus();owner.pasteAndMatchStyle();
-  }
-  else if(action==='reset'){
-   hide();const response=await dialog.showMessageBox(deps.window(),{type:'question',buttons:['취소','이 서비스 로그인 초기화'],defaultId:0,cancelId:0,message:providers[selected].name+'의 테스트판 로그인을 초기화할까요?',detail:'외부 브라우저의 계정과 대화는 삭제하지 않습니다.'});
-   if(response.response===1){for(const popup of popups)if(!popup.isDestroyed())popup.close();wc.close();views.delete(selected);await item.session.clearStorageData();await item.session.clearCache();}
-   deps.relayout();
-  }
-  changed();
- }
- function close(){if(closed)return;closed=true;for(const popup of popups)if(!popup.isDestroyed())popup.close();for(const item of views.values())if(!item.view.webContents.isDestroyed())item.view.webContents.close();views.clear();}
- return {state,show,hide,command,close};
+ function hide(){visible=false;view?.setVisible(false);}
+ function show(id,bounds){if(closed)return;selected=['chatgpt','claude','gemini'].includes(id)?id:'chatgpt';ensure();deps.window().contentView.addChildView(view);view.setBounds(bounds);view.setVisible(true);visible=true;emit();}
+ async function command(a,owner){if(a==='paste-document')await action({action:a});else if(a==='paste-ai'){view?.webContents.focus();view?.webContents.pasteAndMatchStyle();}else if(a==='new'&&selected==='chatgpt')await action({action:'new'});deps.changed();}
+ function close(){if(closed)return;closed=true;clearTimeout(emitTimer);auth.close();chat.stop();cli.close();if(view&&!view.webContents.isDestroyed())view.webContents.close();ipcMain.removeHandler('plan:action');}
+ return {state:()=>({provider:selected,error}),show,hide,command,close};
 }
-module.exports={create,isRemote:wc=>remote.has(wc)};
+module.exports={create,isRemote:()=>false};
