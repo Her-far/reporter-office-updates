@@ -9,6 +9,24 @@ async function mode(p,value){await p.locator('[data-ai-mode='+value+']').click()
 async function service(p,id){await p.locator('.wp-ai-provider').selectOption(id);await until(()=>webState(p).then(s=>s.provider===id),'provider '+id);}
 async function opened(id,p=home){return until(async()=>{const s=await webState(p);if(s.error)throw Error(s.error);return !s.busy&&s.windows[id]?.visible?s.windows[id]:false;},'real browser '+id,70000);}
 async function desktop(name){const file=path.join(root,'browser-desktop-'+name+'.png');const script="Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $r=[System.Windows.Forms.SystemInformation]::VirtualScreen; $b=[System.Drawing.Bitmap]::new($r.Width,$r.Height); $g=[System.Drawing.Graphics]::FromImage($b); $g.CopyFromScreen($r.Location,[System.Drawing.Point]::Empty,$r.Size); $b.Save('"+file.replace(/'/g,"''")+"'); $g.Dispose(); $b.Dispose()";execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script]);}
+function completeFreshBrowserSetup(){
+ const script=`Add-Type -AssemblyName UIAutomationClient; Add-Type -AssemblyName UIAutomationTypes
+ $root=[System.Windows.Automation.AutomationElement]::RootElement
+ $handled=@()
+ for($i=0;$i -lt 24;$i++){
+  foreach($label in @('Stay signed out','Start without your data','Continue without signing in')){
+   $condition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,$label)
+   $button=$root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition)
+   if($button -and $button.Current.IsEnabled){
+    $pattern=$button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
+    $pattern.Invoke();$handled+=$label;Start-Sleep -Milliseconds 900
+   }
+  }
+  if($handled.Count -gt 0){break};Start-Sleep -Milliseconds 400
+ }
+ $handled|ConvertTo-Json -Compress`;
+ console.log('CI fresh browser setup:',execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{encoding:'utf8',timeout:50000}).trim());
+}
 async function expected(p=home){const slot=await p.locator('.wp-slot').boundingBox();return app.evaluate(({BrowserWindow,screen},slot)=>{const w=BrowserWindow.getAllWindows()[0],c=w.getContentBounds();return screen.dipToScreenRect(w,{x:c.x+slot.x,y:c.y+slot.y,width:slot.width,height:slot.height});},slot);}
 async function aligned(id,p=home){let last;try{return await until(async()=>{const s=await webState(p),w=s.windows[id],r=await expected(p);last={actual:w,expected:r,error:s.error};if(s.error)throw Error(s.error);return w?.visible&&['x','y','width','height'].every(k=>Math.abs(w.rect[k]-r[k])<=10);},'browser follows panel '+id);}catch(e){report.geometry=last;throw e;}}
 (async()=>{
@@ -18,8 +36,8 @@ async function aligned(id,p=home){let last;try{return await until(async()=>{cons
  const initial=await webState();
  // CI starts with fresh browser profiles. Seed ordinary blank windows once to
  // skip browser-install onboarding, which is unrelated to service login.
- for(const [id,tail]of [['chrome','Google/Chrome/Application/chrome.exe'],['edge','Microsoft/Edge/Application/msedge.exe']]){if(!initial.browsers.includes(id))continue;const exe=[process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean).map(p=>path.join(p,tail)).find(p=>fs.existsSync(p));if(exe){const child=spawn(exe,['--no-first-run','--no-default-browser-check','--new-window','about:blank'],{detached:true,stdio:'ignore'});child.unref();}}
- await new Promise(r=>setTimeout(r,4500));
+ for(const [id,tail]of [['chrome','Google/Chrome/Application/chrome.exe'],['edge','Microsoft/Edge/Application/msedge.exe']]){if(!initial.browsers.includes(id))continue;const exe=[process.env.PROGRAMFILES,process.env['PROGRAMFILES(X86)'],process.env.LOCALAPPDATA].filter(Boolean).map(p=>path.join(p,tail)).find(p=>fs.existsSync(p));if(exe){const child=spawn(exe,['--no-default-browser-check','--new-window','about:blank'],{detached:true,stdio:'ignore'});child.unref();}}
+ await new Promise(r=>setTimeout(r,4500));completeFreshBrowserSetup();await new Promise(r=>setTimeout(r,2000));
  ok('Installed real Chrome or Edge discovered',initial.browsers.length>0);report.browsers=initial.browsers;
  ok('Browser mode has no embedded terminal or custom subscription chat',await app.evaluate(({webContents})=>!webContents.getAllWebContents().some(w=>/plan-panel|claude\.ai|gemini\.google|chatgpt\.com/.test(w.getURL()))));
  await service(home,'claude');await home.locator('[data-ai-command=open]').click();let claude=await opened('claude');await aligned('claude');ok('A real browser window opens at the Claude website panel');report.browserWindows.push(claude);
