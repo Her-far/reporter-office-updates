@@ -53,10 +53,25 @@ jobs:
         run: |
           $exe = (Get-ChildItem dist/ElectimesOffice-Setup-*.exe).FullName
           ./smoke-test.ps1 -Installer $exe -Base base.exe -Manifest dist/payload-manifest.json -Version "1.0.13-$env:LABEL"
+      - name: Upload the verified test installer
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ElectimesOffice-1.0.13-${{ env.LABEL }}
+          retention-days: 30
+          compression-level: 0
+          path: |
+            electimes-113/dist/ElectimesOffice-Setup-*.exe
+            electimes-113/dist/ElectimesOffice-SHA256SUMS-*.txt
+            electimes-113/dist/package-test.json
+            electimes-113/stage/BUILD-VERIFICATION.json
       - name: Web AI panel test on Windows (stand-in pages)
         run: |
           npm install --prefix qa-tools --no-save --no-audit --no-fund electron@43.7.6 playwright-core@1.62.1
           if ($LASTEXITCODE -ne 0) { throw 'Test tools installation failed' }
+          # Electron 43 does not fetch its binary during npm install.
+          node qa-tools/node_modules/electron/install.js
+          if ($LASTEXITCODE -ne 0) { throw 'Electron download failed' }
           $env:ELECTRON_BINARY = (Resolve-Path qa-tools/node_modules/electron/dist/electron.exe).Path
           $env:PLAYWRIGHT_MODULE = (Resolve-Path qa-tools/node_modules/playwright-core).Path
           $env:WORKPANEL_PAYLOAD = (Resolve-Path stage).Path
@@ -71,17 +86,6 @@ jobs:
           $env:WORKPANEL_PAYLOAD = (Resolve-Path stage).Path
           $env:WORKPANEL_QA_DIR = Join-Path (Get-Location) 'qa-live'
           node workpanel/tests/ai-web-live.cjs
-      - uses: actions/upload-artifact@v4
-        if: success()
-        with:
-          name: ElectimesOffice-1.0.13-${{ env.LABEL }}
-          retention-days: 30
-          compression-level: 0
-          path: |
-            electimes-113/dist/ElectimesOffice-Setup-*.exe
-            electimes-113/dist/ElectimesOffice-SHA256SUMS-*.txt
-            electimes-113/dist/package-test.json
-            electimes-113/stage/BUILD-VERIFICATION.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
