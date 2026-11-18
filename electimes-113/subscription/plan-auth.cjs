@@ -25,7 +25,7 @@ class PlanAuth{
   this.pending=p;this.error='';this.notify();
   const url=new URL(ISSUER+'/api/accounts/authorize');
   for(const [k,v]of Object.entries({client_id:profile?.id||'dynamic_agent_client',ext_agent_host_id:this.data.host,response_type:'code',redirect_uri:p.redirect,scope:SCOPE,resource:RESOURCE,state:p.state,nonce:p.nonce,code_challenge_method:'S256',code_challenge:crypto.createHash('sha256').update(p.verifier).digest('base64url')}))url.searchParams.set(k,v);
-  if(profile){if(profile.hint)url.searchParams.set('id_token_hint',profile.hint);if(profile.email)url.searchParams.set('login_hint',profile.email);}else url.searchParams.set('agent_name_hint','전기신문 Office AI 테스트');
+  if(profile){if(profile.hint)url.searchParams.set('id_token_hint',profile.hint);if(profile.email)url.searchParams.set('login_hint',profile.email);}else url.searchParams.set('agent_name_hint','전기신문 Office');
   if(consent)url.searchParams.set('prompt','consent');
   try{await this.openExternal(url.href);}catch{this.cancel();throw Error('기본 브라우저를 열지 못했습니다.');}
  }

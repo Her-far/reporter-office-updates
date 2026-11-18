@@ -74,7 +74,7 @@ for (const name of ['gemini-acp.cjs','official-cli.cjs']) {
   replacements.set(wp+name,bytes);
 }
 pkg.version = TO.version;
-pkg.electimesModificationNotice = 'Web AI (official ChatGPT, Claude and Gemini pages in isolated sessions) in the work panel; the bundled command line starts Electimes Office.exe and uses the Electimes Office profile. All 1.0.12 fixes and original notices retained.';
+pkg.electimesModificationNotice = 'Web AI (ChatGPT subscription chat, Claude web and Gemini web or Google account chat) in the work panel; the bundled command line starts Electimes Office.exe and uses the Electimes Office profile. All 1.0.12 fixes and original notices retained.';
 replacements.set('package.json', Buffer.from(JSON.stringify(pkg, null, 2)));
 
 fs.cpSync(base, out, { recursive: true, filter: p => !['$PLUGINSDIR', 'Uninstall.exe', 'uninstall.exe'].includes(path.basename(p)) });
@@ -97,7 +97,7 @@ fs.writeFileSync(path.join(out, 'resources/electimes-version.json'), JSON.string
 fs.writeFileSync(path.join(out, 'ELECTIMES-INSTALL.txt'),
   exact(fs.readFileSync(path.join(out, 'ELECTIMES-INSTALL.txt'), 'utf8'), '전기신문 Office 1.0.12', '전기신문 Office ' + shown) +
   (label ? '\n이 설치판은 시험판입니다. 원래대로 돌아가려면 정식 1.0.12 전체 설치판을 다시 설치하세요. 문서와 설정은 유지됩니다.\n' : '') +
-  '\n업무 패널에 ‘웹 AI’를 추가했습니다. ChatGPT·Claude·Gemini 공식 웹사이트를 패널에서 본인 계정으로 쓸 수 있습니다.\n명령줄 도구(ieumoffice)가 전기신문 Office 실행 파일과 사용자 데이터 폴더를 사용하도록 수정했습니다.\n');
+  '\n업무 패널에 ‘웹 AI’를 추가했습니다. ChatGPT 구독 대화, Claude 웹, Gemini 웹 또는 Google 계정 대화를 문서 옆에서 사용할 수 있습니다.\n명령줄 도구(ieumoffice)가 전기신문 Office 실행 파일과 사용자 데이터 폴더를 사용하도록 수정했습니다.\n');
 
 const changed = new Set(['resources/app.asar', 'resources/electimes-version.json', 'ELECTIMES-INSTALL.txt', 'BUILD-VERIFICATION.json',
   ...CLI_FILES.map(f => 'resources/cli/' + f), ...modulePreloads]);

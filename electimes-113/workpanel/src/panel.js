@@ -143,7 +143,6 @@ function aiWebView(){const w=state.aiWeb,n=el('div','mail-shell ai-shell'),bar=e
  for(const x of w.services){const b=button(x.label,()=>action('ai-service',x.id),x.id===w.service?'active':'');b.setAttribute('role','tab');b.setAttribute('aria-selected',String(x.id===w.service));tabs.append(b);}
  const back=button('←',()=>action('ai-back'),'ai-back');back.title='뒤로';back.setAttribute('aria-label','뒤로');back.disabled=!w.canGoBack;
  const reload=button('↻',()=>action('ai-reload'));reload.title='새로고침';reload.setAttribute('aria-label','새로고침');
- const expand=button(state.expanded?'분할':'넓게',()=>action('mail-expand'));expand.title='웹 AI 넓게 보기 / 분할 보기';
  const label=w.services.find(x=>x.id===w.service)?.label||'AI';
  const more=el('details','mail-more'),summary=el('summary','','⋯');summary.title='로그인 · 브라우저 · 배율';summary.setAttribute('aria-label','웹 AI 추가 메뉴');more.append(summary);
  const extra=el('div','mail-extra ai-extra');
@@ -155,9 +154,9 @@ function aiWebView(){const w=state.aiWeb,n=el('div','mail-shell ai-shell'),bar=e
  extra.append(el('p','sub','로그인은 별도 창에서 하고, 끝나면 창이 닫히며 패널에 반영됩니다. 그래도 안 되면 Edge 창으로 여세요(평소 브라우저의 로그인 사용).'));
  }
  more.append(extra);
- if(w.service==='chatgpt') bar.append(tabs,expand);
- else if(w.google)bar.append(tabs,expand,more);
- else bar.append(tabs,back,reload,expand,more);
+ if(w.service==='chatgpt') bar.append(tabs);
+ else if(w.google)bar.append(tabs,more);
+ else bar.append(tabs,back,reload,more);
  n.append(bar);
  if(!w.enabled){n.append(el('p','empty','업무 연동 설정에서 웹 AI를 켜 주세요.'));return n;}
  if(w.google){n.append(googleConversation());return n;}
