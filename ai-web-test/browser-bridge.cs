@@ -69,8 +69,8 @@ class BrowserBridge {
    foreach(var pair in new List<KeyValuePair<string,Entry>>(Windows)){var e=pair.Value;if(!Valid(e)){Windows.Remove(pair.Key);continue;}
     if(visible&&pair.Key==id&&w>=450&&height>=250){
      // Retain normal frame/address bar. No SetParent or owner changes.
-     if(IsIconic(e.H)||IsZoomed(e.H))ShowWindow(e.H,9);if(!IsWindowVisible(e.H))ShowWindow(e.H,4);
-     SetWindowPos(e.H,IntPtr.Zero,x,y,w,height,0x14);IntPtr fg=GetForegroundWindow();if(Yes(q,"raise")&&(fg==Office||fg==e.H))SetWindowPos(e.H,IntPtr.Zero,0,0,0,0,0x13);
+     if(IsIconic(e.H)||IsZoomed(e.H)){Windows.Remove(pair.Key);continue;}if(!IsWindowVisible(e.H))ShowWindow(e.H,4);
+     SetWindowPos(e.H,IntPtr.Zero,x,y,w,height,0x14);Rect actual;GetWindowRect(e.H,out actual);if(actual.Right-actual.Left>w+12||actual.Bottom-actual.Top>height+12){Release(pair.Key,true);throw new Exception("브라우저 창이 패널보다 커서 일반 창으로 열었습니다. 브라우저의 첫 실행/프로필 선택을 마치거나 패널을 확대한 뒤 다시 열어 주세요.");}IntPtr fg=GetForegroundWindow();if(Yes(q,"raise")&&(fg==Office||fg==e.H))SetWindowPos(e.H,IntPtr.Zero,0,0,0,0,0x13);
     }else if(IsWindowVisible(e.H))ShowWindow(e.H,0);
    }return Snapshot();
   }throw new Exception("지원하지 않는 브라우저 명령입니다.");
