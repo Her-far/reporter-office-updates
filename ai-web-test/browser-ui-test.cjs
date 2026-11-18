@@ -11,21 +11,28 @@ async function opened(id,p=home){return until(async()=>{const s=await webState(p
 async function desktop(name){if(app){await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].focus()).catch(()=>{});await new Promise(r=>setTimeout(r,350));}const file=path.join(root,'browser-desktop-'+name+'.png');const script="Add-Type -AssemblyName System.Windows.Forms; Add-Type -AssemblyName System.Drawing; $r=[System.Windows.Forms.SystemInformation]::VirtualScreen; $b=[System.Drawing.Bitmap]::new($r.Width,$r.Height); $g=[System.Drawing.Graphics]::FromImage($b); $g.CopyFromScreen($r.Location,[System.Drawing.Point]::Empty,$r.Size); $b.Save('"+file.replace(/'/g,"''")+"'); $g.Dispose(); $b.Dispose()";execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script]);}
 function completeFreshBrowserSetup(){
  const script=`Add-Type -AssemblyName UIAutomationClient; Add-Type -AssemblyName UIAutomationTypes
- $root=[System.Windows.Automation.AutomationElement]::RootElement
- $handled=@()
- for($i=0;$i -lt 24;$i++){
-  foreach($label in @('Stay signed out','Start without your data','Continue without signing in')){
-   $condition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,$label)
-   $button=$root.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition)
-   if($button -and $button.Current.IsEnabled){
-    $pattern=$button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern)
-    $pattern.Invoke();$handled+=$label;Start-Sleep -Milliseconds 900
+ $root=[System.Windows.Automation.AutomationElement]::RootElement;$handled=@();$quiet=0
+ for($i=0;$i -lt 30;$i++){
+  $changed=$false
+  $windows=$root.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.Condition]::TrueCondition)
+  foreach($window in $windows){
+   try{$name=(Get-Process -Id $window.Current.ProcessId -ErrorAction Stop).ProcessName}catch{continue}
+   if($name -eq 'chrome'){$labels=@('Stay signed out')}
+   elseif($name -eq 'msedge'){$labels=@('Start without your data','Continue without signing in','Confirm and start browsing','Continue','Confirm','Get started')}
+   else{continue}
+   foreach($label in $labels){
+    $condition=[System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty,$label)
+    $button=$window.FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition)
+    if($button -and $button.Current.IsEnabled){$button.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke();$handled+=$name+': '+$label;$changed=$true;Start-Sleep -Milliseconds 900;break}
    }
   }
-  if($handled.Count -gt 0){break};Start-Sleep -Milliseconds 400
+  if($changed){$quiet=0}else{$quiet++};if($quiet -ge 5 -and $handled.Count -gt 0){break};Start-Sleep -Milliseconds 400
  }
+ # Close only the anonymous onboarding windows created by this test fixture.
+ $windows=$root.FindAll([System.Windows.Automation.TreeScope]::Children,[System.Windows.Automation.Condition]::TrueCondition)
+ foreach($window in $windows){try{$name=(Get-Process -Id $window.Current.ProcessId -ErrorAction Stop).ProcessName;if($name -in @('chrome','msedge')){$window.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern).Close()}}catch{}}
  $handled|ConvertTo-Json -Compress`;
- console.log('CI fresh browser setup:',execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{encoding:'utf8',timeout:50000}).trim());
+ console.log('CI fresh browser setup:',execFileSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',script],{encoding:'utf8',timeout:60000}).trim());
 }
 function auditBrowserWindows(){
  const script=`Add-Type -AssemblyName UIAutomationClient;Add-Type -AssemblyName UIAutomationTypes
