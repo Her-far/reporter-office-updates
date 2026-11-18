@@ -20,7 +20,10 @@ $ProgressPreference = 'SilentlyContinue'
 $authorized = $false
 for ($attempt = 0; $attempt -lt 18000; $attempt++) {
   if (Test-Path -LiteralPath ${ps(job.commit)}) { $authorized = $true; break }
-  if (($attempt % 10) -eq 0 -and -not (Get-Process -Id ${parentPid} -ErrorAction SilentlyContinue)) { exit 0 }
+  if (($attempt % 10) -eq 0 -and -not (Get-Process -Id ${parentPid} -ErrorAction SilentlyContinue)) {
+    if (Test-Path -LiteralPath ${ps(job.commit)}) { $authorized = $true; break }
+    exit 0
+  }
   Start-Sleep -Milliseconds 100
 }
 if (-not $authorized) { exit 0 }
