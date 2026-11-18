@@ -239,8 +239,9 @@ function register(deps){
       else if(a==='reset-mail'){const r=await dialog.showMessageBox(deps.window(),{type:'question',buttons:['취소','로그인 초기화'],defaultId:0,cancelId:0,message:'내장 웹메일의 네이버웍스 로그인을 초기화할까요?',detail:'작성 중인 메일은 먼저 저장하세요. 외부 브라우저의 로그인과 간편 메일 연결은 바뀌지 않습니다.'});if(r.response===1){for(const w of popups)w.close();if(mail){deps.window().contentView.removeChildView(mail);mail.webContents.close();mail=null;}if(mailSession){await mailSession.clearStorageData();await mailSession.clearCache();await mailSession.closeAllConnections();}mailReady=false;mailError='';layout();}}
       else if(a==='gemini-chat') {
         if(!prefs.aiWebEnabled||!useGoogleChat()||panelMode!=='aiweb')throw Error('ai-disabled');
-        if(!['install','connect','send','cancel','guide'].includes(x?.name))throw Error('unknown-action');
+        if(!['install','connect','send','cancel','guide','new','select','usage'].includes(x?.name))throw Error('unknown-action');
         if(x.name==='guide')await shell.openExternal('https://antigravity.google/docs/cli/install');
+        else if(x.name==='usage')await shell.openExternal('https://support.google.com/googleone/answer/14534406?hl=ko');
         else void googleChat().run(x.name,x.text);
       }
       else if(a==='ai-service'){if(!aiWeb.SERVICES[x])throw Error('unknown-action');prefs=settingsOf({aiWebService:x},prefs);await persist();layout();}

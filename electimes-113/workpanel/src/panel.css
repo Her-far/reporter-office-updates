@@ -29,3 +29,5 @@
 .google-compose{display:flex;gap:6px;align-items:end}
 .google-compose textarea{min-width:0;flex:1;padding:8px;resize:vertical}
 .ai-toolbar:has(+.google-conversation):has(.mail-more[open]){min-height:80px}
+
+.google-conversation .toolbar select{min-width:0;max-width:44%;text-overflow:ellipsis}

@@ -56,7 +56,8 @@ class Connection {
 }
 
 function create({root,fetch,changed, launch=spawn, installer}) {
-  let client, sessionId, busy=false, notice='', timer, closed=false, messages=[];
+  let client, sessionId, busy=false, notice='', timer, closed=false, operation='';
+  const threads=new Map();
   function notify() {
     if (!closed && !timer) timer=setTimeout(() => {timer=null; changed();},60);
   }
@@ -65,10 +66,12 @@ function create({root,fetch,changed, launch=spawn, installer}) {
   function state() {
     const installed=program.state('gemini');
     return {installed:installed.installed,ready:!!sessionId,busy,
-      notice:installed.busy?installed.notice:notice,messages};
+      notice:installed.busy?installed.notice:notice,
+      current:sessionId, conversations:Array.from(threads,([id,t])=>({id,title:t.title})),
+      messages:threads.get(sessionId)?.messages || [],cancellable:busy && operation!=='new'};
   }
   function update(params) {
-    const u=params?.update, last=messages.at(-1);
+    const u=params?.update, last=threads.get(sessionId)?.messages.at(-1);
     if (params?.sessionId===sessionId && u?.sessionUpdate==='agent_message_chunk' &&
         u.content?.type==='text' && last?.role==='Gemini') {
       last.text += u.content.text;
@@ -86,33 +89,43 @@ function create({root,fetch,changed, launch=spawn, installer}) {
     client=link;
     const capabilities=await link.call('initialize',{protocolVersion:1,clientCapabilities:{},clientInfo:{name:'electimes-office',version:'1.0.13'}});
     if (capabilities?.protocolVersion!==1) throw Error('호환되는 Google Antigravity 버전을 설치하세요.');
-    const params={cwd,mcpServers:[]};
-    let result;
-    try { result=await link.call('session/new',params); }
-    catch(e) {
-      if(e.code!==-32000) throw e;
-      if(!capabilities.authMethods?.some(m=>m.id==='oauth-personal')) throw Error('이 Google 프로그램에서 개인 계정 로그인을 제공하지 않습니다.');
-      notice='브라우저에서 Google 로그인을 마친 뒤 오피스로 돌아오세요.'; notify();
-      await link.call('authenticate',{methodId:'oauth-personal'});
-      result=await link.call('session/new',params);
+    if (!capabilities.authMethods?.some(m=>m.id==='oauth-personal')) {
+      throw Error('Google 개인 계정 로그인을 사용할 수 없습니다. Antigravity 버전을 확인하세요.');
     }
-    if(typeof result?.sessionId!=='string'||!result.sessionId) throw Error('대화 세션을 열지 못했습니다.');
-    sessionId=result.sessionId; messages=[]; notice='';
+    notice='Google 개인 계정 연결을 확인하고 있습니다. 브라우저가 열리면 로그인을 마쳐 주세요.'; notify();
+    await link.call('authenticate',{methodId:'oauth-personal'});
+    await newConversation(link);
+  }
+  async function newConversation(link) {
+    if (!link) throw Error('Google 계정을 먼저 연결하세요.');
+    const result=await link.call('session/new',{cwd,mcpServers:[]});
+    const id=result?.sessionId;
+    if (client!==link || typeof id!=='string' || !id || threads.has(id)) throw Error('새 대화를 열지 못했습니다.');
+    threads.set(id,{title:'새 대화 '+(threads.size+1),messages:[]});
+    sessionId=id;notice='';
   }
   async function run(action,value) {
     if (action==='cancel') {
+      if(operation==='new')return;
       if (sessionId && busy) client?.write({method:'session/cancel',params:{sessionId}});
       else if (busy) {client?.close();program.stop('gemini');}
       return;
     }
     if (busy || closed) return;
-    busy=true;notice='';notify();
+    busy=true;operation=action;notice='';notify();
     try {
       if(action==='install') {await program.install('gemini');notice='설치했습니다. Google 계정으로 연결하세요.';}
-      else if(action==='connect'&&!sessionId) {notice='Google 프로그램에 연결 중입니다.';await connect();}
+      else if(action==='connect'&&!sessionId) {threads.clear();notice='Google 프로그램에 연결 중입니다.';await connect();}
+      else if(action==='new') await newConversation(client);
+      else if(action==='select') {
+        if (!client || !threads.has(value)) throw Error('연결 중인 대화를 선택하세요.');
+        sessionId=value;
+      }
       else if(action==='send') {
         if(!sessionId||!client) throw Error('Google 계정을 먼저 연결하세요.');
         if(typeof value!=='string'||!value.trim()||value.length>80000) throw Error('질문을 1~80,000자로 입력하세요.');
+        const thread=threads.get(sessionId), messages=thread.messages;
+        if (!messages.length) thread.title=value.trim().replace(/\s+/g,' ').slice(0,40);
         messages.push({role:'나',text:value},{role:'Gemini',text:''});
         const r=await client.call('session/prompt',{sessionId,prompt:[{type:'text',text:value}]});
         if (r?.stopReason==='cancelled') notice='답변을 중지했습니다.';
@@ -121,7 +134,7 @@ function create({root,fetch,changed, launch=spawn, installer}) {
     } catch(e) {
       if(action==='connect') {client?.close();client=null;sessionId=null;}
       notice=e.message||'Google 계정 연결을 다시 시도하세요.';
-    } finally {busy=false;notify();}
+    } finally {busy=false;operation='';notify();}
   }
   function close() {closed=true;clearTimeout(timer);client?.close();program.close();}
   return {state,run,close};

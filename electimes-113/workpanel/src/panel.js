@@ -106,15 +106,29 @@ function googleConversation() {
  const guide=button('설치 안내',()=>cmd('guide'));
  const login=button('Google 계정으로 연결',()=>cmd('connect'),'primary');
  const cancel=button('중지',()=>cmd('cancel'));
+ const create=button('새 대화',()=>cmd('new'));
+ const threads=el('select');threads.setAttribute('aria-label','현재 연결의 Gemini 대화');
+ threads.onchange=()=>cmd('select',threads.value);
+ const drafts=new Map();let displayed;
+ const usage=button('사용량 안내',()=>cmd('usage'));
+
  input.placeholder='Gemini에게 질문하세요';input.maxLength=80000;
  input.setAttribute('aria-label','Gemini 질문');
  let submitting=false;
  async function submit(){const text=input.value;if(submitting||!text.trim()||!state.aiWeb.google?.ready||state.aiWeb.google.busy)return;submitting=true;try{if(await cmd('send',text)&&input.value===text)input.value='';}finally{submitting=false;}}
  input.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey&&!e.isComposing){e.preventDefault();void submit();}};
  const compose=el('div','google-compose');compose.append(input,send);
- tools.append(install,guide,login,cancel);box.append(tools,message,history,compose);
- box.update=({installed,ready,busy,notice,messages})=>{
-   install.hidden=guide.hidden=installed;login.hidden=!installed||ready;install.disabled=login.disabled=busy;cancel.hidden=!busy;
+ tools.append(install,guide,login,threads,create,cancel,usage);box.append(tools,message,history,compose);
+ box.update=({installed,ready,busy,cancellable,notice,messages,current,conversations})=>{
+   threads.hidden=!ready||conversations.length<2;create.hidden=!ready;threads.disabled=create.disabled=busy;
+   const options=JSON.stringify(conversations);
+   if(threads.dataset.options!==options){
+     threads.replaceChildren(...conversations.map(({title,id})=>new Option(title,id)));threads.dataset.options=options;
+   }
+   if(current)threads.value=current;
+   if(displayed!==current){if(displayed)drafts.set(displayed,input.value);input.value=drafts.get(current)||'';displayed=current;}
+
+   install.hidden=guide.hidden=installed;login.hidden=!installed||ready;install.disabled=login.disabled=busy;cancel.hidden=!cancellable;
    message.textContent=notice||(!installed?'Google Antigravity를 설치한 뒤 개인 Google 계정으로 연결하세요.':'');message.hidden=!message.textContent;
    compose.hidden=!ready;send.disabled=busy;
    const stick=history.scrollHeight-history.scrollTop-history.clientHeight<80;
