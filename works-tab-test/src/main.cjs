@@ -6,15 +6,20 @@ const remoteContents = new WeakSet();
 let installed;
 function register(deps) {
   if (installed) return installed;
-  let current = null, externalPrompt = false;
-  const partition = session.fromPartition('persist:electimes-works-test');
-  // No Office bridges, devices, or native notifications are exposed to remote pages.
-  partition.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-  partition.setPermissionCheckHandler(() => false);
-  partition.on('will-download', (event, item, wc) => {
-    if (!remoteContents.has(wc) || !isWorksUrl(wc.getURL())) { event.preventDefault(); return; }
-    item.setSaveDialogOptions({ title: 'Works 파일 저장', defaultPath: path.join(app.getPath('downloads'), path.basename(item.getFilename())) });
-  });
+  let current = null, externalPrompt = false, partition;
+  // IPC registration happens before app.ready. Create the session only on first open.
+  function worksSession() {
+    if (partition) return partition;
+    partition = session.fromPartition('persist:electimes-works-test');
+    // No Office bridges, devices, or native notifications are exposed to remote pages.
+    partition.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+    partition.setPermissionCheckHandler(() => false);
+    partition.on('will-download', (event, item, wc) => {
+      if (!remoteContents.has(wc) || !isWorksUrl(wc.getURL())) { event.preventDefault(); return; }
+      item.setSaveDialogOptions({ title: 'Works 파일 저장', defaultPath: path.join(app.getPath('downloads'), path.basename(item.getFilename())) });
+    });
+    return partition;
+  }
   function state(message, failed = false, loading = false) {
     if (!current || current.host.webContents.isDestroyed()) return;
     current.state = { message, failed, loading };
@@ -68,7 +73,7 @@ function register(deps) {
     attach();
     if (current && m.tabById(current.id)) { m.activateTab(current.id); return current.id; }
     const host = new WebContentsView({ webPreferences: { preload: path.join(__dirname, 'preload.cjs'), sandbox: true, contextIsolation: true, nodeIntegration: false } });
-    const remote = new WebContentsView({ webPreferences: { session: partition, sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, allowRunningInsecureContent: false, navigateOnDragDrop: false } });
+    const remote = new WebContentsView({ webPreferences: { session: worksSession(), sandbox: true, contextIsolation: true, nodeIntegration: false, webSecurity: true, allowRunningInsecureContent: false, navigateOnDragDrop: false } });
     remoteContents.add(remote.webContents);
     host.setBackgroundColor('#f5f7fb'); remote.setBackgroundColor('#ffffff');
     const record = { id: `t${m.nextId++}`, host, remote, loaded: false, state: { message: 'Works에 연결하고 있습니다.', loading: true, failed: false } };

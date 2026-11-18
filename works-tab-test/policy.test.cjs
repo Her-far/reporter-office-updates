@@ -32,3 +32,13 @@ test('Updater actions are inert, cannot enable a production feed, and reject oth
     assert.throws(() => fn({ sender: host, senderFrame: {} }));
   }
 });
+test('Registering Works IPC before Electron is ready creates no native session or view', () => {
+  const handlers = new Map(), module = { exports: {} };
+  vm.runInNewContext(fs.readFileSync(require.resolve('./src/main.cjs'), 'utf8'), { module, require(name) {
+    if (name === 'electron') return { app: {}, ipcMain: { handle: (name, fn) => handlers.set(name, fn) }, session: { fromPartition() { throw Error('session used before ready'); } }, WebContentsView: class { constructor() { throw Error('view used before ready'); } } };
+    if (name === './policy.cjs') return require('./src/policy.cjs');
+    return require(name);
+  } });
+  module.exports.register({ window: () => null, manager: () => null });
+  assert.equal(handlers.size, 2);
+});
