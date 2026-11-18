@@ -2,6 +2,7 @@
 // Only this process's PrintDlgExW import is wrapped; rendering, DEVMODE, and the
 // document's printer DPI are left to Chromium and the installed driver.
 #include <windows.h>
+#include <objbase.h>
 #include <commdlg.h>
 #include <delayimp.h>
 #include <node_api.h>

@@ -51,6 +51,17 @@ jobs:
           Get-Printer | Format-Table Name,DriverName
           node print-native.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Native printing verification failed' }
+      - name: Package full installer and compact update, then verify both installations
+        working-directory: electimes-112
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          python rebuild.py
+          if ($LASTEXITCODE -ne 0) { throw 'Installer packaging failed' }
+          ./smoke.ps1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -60,3 +71,7 @@ jobs:
             electimes-112/*-windows.png
             electimes-112/stage/BUILD-VERIFICATION.json
             electimes-112/native/build/Release/print_compat.node
+            electimes-112/windows-smoke.json
+            electimes-112/startup-*.txt
+            electimes-112/ElectimesOffice-*1.0.12*
+            electimes-112/electimes-latest.json
