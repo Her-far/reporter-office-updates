@@ -1,27 +1,24 @@
 {
   "product": "electimes-office",
   "platform": "win32-x64",
-  "version": "1.0.9",
-  "build": 109,
+  "version": "1.0.10",
+  "build": 110,
   "minBuild": 103,
-  "maxBuild": 108,
+  "maxBuild": 109,
   "notes": [
-    "다운로드가 끝나도 종료하지 않고 재시작 버튼을 누를 때까지 기다립니다.",
-    "이미 받은 업데이트 파일을 재사용할 때도 자동 종료하지 않습니다.",
-    "AI 패널 접기·다시 열기와 왼쪽·오른쪽 이동을 수정했습니다.",
-    "찾기 창을 닫은 뒤 바로 화살표 이동 및 키보드 편집이 가능합니다.",
-    "본문 첨부파일 링크를 지정한 다운로드 폴더에 저장할 수 있습니다.",
-    "HWP 표 잘림과 긴 본문 드래그 선택을 개선했습니다.",
-    "기존 계정 연결·문서·메모와 DOC 재열기 개선을 유지합니다."
+    "홈 화면에서도 설정한 패널 위치를 적용합니다.",
+    "확대 화면에 패널로 돌아가기 버튼을 표시하고 Esc로 복원합니다.",
+    "홈 화면의 확대 패널이 문서 탭과 창 조작 버튼을 가리지 않도록 수정했습니다.",
+    "기존 패널 너비와 작성 중인 메모를 유지합니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.9/ElectimesOffice-Setup-1.0.9-x64.exe",
-    "size": 300165363,
-    "sha256": "238ee7afbf096e8725cb7d7c9409f5b74f7cf45f6c5c42377233669296ba4483"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.10/ElectimesOffice-Setup-1.0.10-x64.exe",
+    "size": 300160284,
+    "sha256": "91a7b5b39254c8345588cfefb28d386a96c882bdeec352edd8aaf6a0040e066e"
   },
   "fullInstaller": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.9/ElectimesOffice-Setup-1.0.9-x64.exe",
-    "size": 300165363,
-    "sha256": "238ee7afbf096e8725cb7d7c9409f5b74f7cf45f6c5c42377233669296ba4483"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.10/ElectimesOffice-Setup-1.0.10-x64.exe",
+    "size": 300160284,
+    "sha256": "91a7b5b39254c8345588cfefb28d386a96c882bdeec352edd8aaf6a0040e066e"
   }
 }
