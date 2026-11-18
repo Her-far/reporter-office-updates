@@ -75,7 +75,7 @@
     if(!target.classList.contains('wp-dock'))target.classList.add('wp-dock');
     if(open&&state.menu==='ai'){const rail=target.querySelector('button.ai-rail,button[data-tip]');if(rail?.classList.contains('ai-rail')&&!rail.dataset.wpExpanding){rail.dataset.wpExpanding='1';rail.click();}}
     target.classList.toggle('wp-closed',!open);target.classList.toggle('wp-expanded',!!state.expanded||innerWidth<740);target.dataset.wpMenu=state.menu;
-    bar.querySelector('.wp-restore').hidden=!(state.expanded||innerWidth<740);bar.querySelector('.wp-expand').textContent=state.expanded?'↙':'↗';
+    bar.querySelector('.wp-restore').hidden=!(state.expanded||innerWidth<740);const expand=bar.querySelector('.wp-expand'),glyph=state.expanded?'↙':'↗';if(expand.textContent!==glyph)expand.textContent=glyph;
     const w=(state.expanded||innerWidth<740)?innerWidth:Math.max(300,Math.min(savedWidth(),innerWidth-320));
     const width=w+'px';if(target.style.getPropertyValue('width')!==width)target.style.setProperty('width',width,'important');
     const body=target.closest('.sheet-body');if(body){const size=(open&&!state.expanded&&innerWidth>=740?w:0)+'px';const columns=onLeft()?`${size} minmax(0,1fr)`:`minmax(0,1fr) ${size}`;if(body.style.getPropertyValue('grid-template-columns')!==columns)body.style.setProperty('grid-template-columns',columns,'important');}
