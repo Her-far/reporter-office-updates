@@ -19,10 +19,11 @@ jobs:
         run: |
           $ErrorActionPreference='Stop'
           $repo='Her-far/reporter-office-updates'
-          $run=44266276089
-          $tested='d129cec2ad7200cdd58850f622e9fb69f5ad82be'
+          $run=44275969209
+          $tested='75712a37ae857a067999d1a66a5248726ba4fca9'
+          $verification='272550c261c94b729dd3540505b2ad1044eb0a54'
           $result=gh api "repos/$repo/actions/runs/$run"|ConvertFrom-Json
-          if($LASTEXITCODE -ne 0 -or $result.conclusion -ne 'success' -or $result.head_sha -ne $tested -or $result.head_branch -ne 'test/electimes-ai-web-20261118'){throw 'Exact test build has not passed'}
+          if($LASTEXITCODE -ne 0 -or $result.conclusion -ne 'success' -or $result.head_sha -ne $verification -or $result.head_branch -ne 'test/electimes-ai-web-20261118'){throw 'Exact test build has not passed'}
           $mainBefore=gh api "repos/$repo/git/ref/heads/main" --jq '.object.sha'
           gh run download $run --repo $repo --name electimes-ai-web-test-validation --dir verified-input
           if($LASTEXITCODE -ne 0){throw 'Tested artifact download failed'}
@@ -30,7 +31,7 @@ jobs:
           $ui=Get-Content -Raw "$root/ui-windows.json"|ConvertFrom-Json
           $install=Get-Content -Raw "$root/install-windows.json"|ConvertFrom-Json
           $build=Get-Content -Raw "$root/dist/BUILD-VERIFICATION.json"|ConvertFrom-Json
-          if(!$ui.pass -or !$install.pass -or $build.productionUpdates -or $build.separateProfile -ne 'ElectimesOffice-AIWeb-Test'){throw 'Test evidence is incomplete'}
+          if(!$ui.pass -or !$install.pass -or $install.sourceCommit -ne $tested -or $install.sourceRun -ne 44273901294 -or $build.productionUpdates -or $build.separateProfile -ne 'ElectimesOffice-AIWeb-Test'){throw 'Test evidence is incomplete'}
           $package=Get-Content -Raw "$root/dist/package-windows.json"|ConvertFrom-Json
           foreach($file in $package.artifacts){
             $path=Join-Path "$root/dist" $file.name
@@ -38,7 +39,7 @@ jobs:
           }
           $assets=@($package.artifacts|ForEach-Object {Join-Path "$root/dist" $_.name})
           $assets+=@("$root/dist/SHA256SUMS.txt","$root/ui-windows.json","$root/install-windows.json")
-          gh release create electimes-ai-web-test-v1.0.12.1 @assets --repo $repo --target $tested --title '전기신문 Office AI 웹 채팅 테스트판 1' --notes-file ai-web-test/release-notes.md --prerelease --latest=false
+          gh release create electimes-ai-web-test-v1.0.12.2 @assets --repo $repo --target $tested --title '전기신문 Office 구독 대화 테스트판 2' --notes-file ai-web-test/release-notes.md --prerelease --latest=false
           if($LASTEXITCODE -ne 0){throw 'Prerelease publication failed'}
           $mainAfter=gh api "repos/$repo/git/ref/heads/main" --jq '.object.sha'
           if($mainAfter -ne $mainBefore){throw 'Production branch changed during publication; inspect independently'}
