@@ -1,25 +1,24 @@
 {
   "product": "electimes-office",
   "platform": "win32-x64",
-  "version": "1.0.11",
-  "build": 111,
-  "minBuild": 103,
-  "maxBuild": 110,
+  "version": "1.0.12",
+  "build": 112,
+  "minBuild": 111,
+  "maxBuild": 111,
   "notes": [
-    "HWP 표 안에서 긴 글을 붙여넣은 뒤 아래 문단과 겹치는 문제를 수정했습니다.",
-    "잘라내기·범위 삭제 후 남은 문단의 위치를 다시 계산합니다.",
-    "중첩 표의 서식 있는 붙여넣기에도 같은 수정을 적용했습니다.",
-    "빈 줄 삭제 시 본문 줄 간격을 유지하고 실행 취소 시 원래 서식을 복원합니다.",
-    "1.0.10 패널 수정을 유지합니다."
+    "Windows 인쇄 기본 설정창과 내부 항목을 동일한 화면 배율로 표시하도록 호환성을 개선했습니다.",
+    "HWP 인쇄 설정창이 오피스 앞에 표시되도록 임시 인쇄창 처리를 수정했습니다.",
+    "1.0.11에서는 변경 파일만 다운로드합니다. 이전 버전은 전체 설치판으로 업데이트합니다.",
+    "1.0.11의 HWP 붙여넣기·줄 간격 및 이전 패널 수정은 유지합니다."
   ],
   "installer": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.11/ElectimesOffice-Setup-1.0.11-x64.exe",
-    "size": 300167741,
-    "sha256": "d333bff0e1de01e333698cb74199064feece7f730e6a76d5b9f26a6e42222722"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Update-1.0.12-x64.exe",
+    "size": 16029815,
+    "sha256": "a0090bc7d60ef61ab645826b52d4f9595a8cee921ee3dca558333d9ff68e4db1"
   },
   "fullInstaller": {
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.11/ElectimesOffice-Setup-1.0.11-x64.exe",
-    "size": 300167741,
-    "sha256": "d333bff0e1de01e333698cb74199064feece7f730e6a76d5b9f26a6e42222722"
+    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Setup-1.0.12-x64.exe",
+    "size": 300226743,
+    "sha256": "8060e3e6e89bf33aed3d3a99fa00d1ea8e85cba22d42c3bc6693b47a38604431"
   }
 }
