@@ -121,6 +121,26 @@ for(const kind of ['flat','path','nested']){
     report.cases.push({name,bodySpacingPreserved:true,blankFormattingUndo:true,redo:true,saveReopen:true});
   }catch(e){report.failures.push({name,error:String(e)});}finally{d.free();}
 }
+for(const kind of ['flat','path','nested']){
+  const name=`${kind}/upper-lower-blank-deletion`,outcomes=[];
+  try{
+    for(const mergeAt of [1,2]){
+      const d=new api.HwpDocument(Buffer.from(fs.readFileSync(path.join(root,`cell-flow-${kind==='nested'?'nested':'flat'}.hwp.b64`),'utf8'),'base64')),c=context(kind);
+      try{
+        invoke(d,c,kind,'insertText',2,0,'▲');
+        invoke(d,c,kind,'splitParagraph',2,0);
+        const before=layout(d,c);
+        const removed=JSON.parse(invoke(d,c,kind,'mergeParagraph',mergeAt));
+        outcomes.push(noOverlap(d,c,name));
+        const undoAt=mergeAt-1;
+        invoke(d,c,kind,'splitParagraph',undoAt,removed.charOffset,JSON.stringify(removed.removedParaMeta));
+        assert.deepEqual(layout(d,c),before,'Undo restores both differently formatted empty lines');
+      }finally{d.free();}
+    }
+    assert.deepEqual(outcomes[0],outcomes[1],'Deleting either blank must leave the same one-line space');
+    report.cases.push({name,sameRemainingBlank:true,sameBodyPosition:true,undoBothFormats:true});
+  }catch(e){report.failures.push({name,error:String(e)});}
+}
 {
   const name='stored-frame-reset';
   const d=new api.HwpDocument(Buffer.from(fs.readFileSync(path.join(root,'cell-flow-reset.hwpx.b64'),'utf8'),'base64'));

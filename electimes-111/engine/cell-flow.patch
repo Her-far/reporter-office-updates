@@ -112,7 +112,7 @@
  use crate::model::shape::{ShapeObject, TextWrap, VertRelTo};
  use crate::model::style::Alignment;
  use crate::renderer::composer::{
-@@ -35,6 +35,85 @@
+@@ -35,6 +35,84 @@
          }
          _ => false,
      }
@@ -135,8 +135,7 @@
 +    para_shapes: &[crate::model::style::ParaShape],
 +) -> (usize, ParaMeta) {
 +    let mut removed_meta = next.capture_meta();
-+    let empty_prefix =
-+        previous.text.is_empty() && previous.controls.is_empty() && !next.text.is_empty();
++    let empty_prefix = previous.text.is_empty() && previous.controls.is_empty();
 +    if empty_prefix {
 +        removed_meta.empty_prefix_format = Some(EmptyPrefixFormat {
 +            para_shape_id: previous.para_shape_id,
@@ -198,7 +197,7 @@
  }
  
  fn recalculate_cell_paragraph_vpos(
-@@ -3388,6 +3467,18 @@
+@@ -3388,6 +3466,18 @@
  
          if let Some((ppi, ci, cei)) = cell_ctx {
              // ─── 셀 내 deleteRange ───
@@ -217,7 +216,7 @@
              if start_para == end_para {
                  // 같은 문단 내 삭제
                  let count = end_offset - start_offset;
-@@ -3440,6 +3531,15 @@
+@@ -3440,6 +3530,15 @@
                  self.reflow_cell_paragraph(section_idx, ppi, ci, cei, start_para);
              }
  
@@ -233,7 +232,7 @@
              // 부모 컨트롤 dirty 마킹 + 재페이지네이션
              self.mark_cell_control_dirty(section_idx, ppi, ci);
              self.mark_section_dirty(section_idx);
-@@ -4644,6 +4744,8 @@
+@@ -4644,6 +4743,8 @@
          char_offset: usize,
          restore_meta: Option<ParaMeta>,
      ) -> Result<String, HwpError> {
@@ -242,7 +241,7 @@
          // 셀 문단 검증 및 분할
          let cell_para = self.get_cell_paragraph_mut(
              section_idx,
-@@ -4654,6 +4756,9 @@
+@@ -4654,6 +4755,9 @@
          )?;
          let original_vpos = cell_para.line_segs.first().map(|seg| seg.vertical_pos);
          let mut new_para = cell_para.split_at(char_offset);
@@ -252,7 +251,7 @@
          if let Some(meta) = restore_meta {
              restore_para_meta(&mut new_para, meta, &self.document.doc_info.para_shapes);
          }
-@@ -4790,6 +4895,7 @@
+@@ -4790,6 +4894,7 @@
          // 사라지는 문단의 스코프 메타를 캡처해 결과에 실어 보낸다 — undo(split)가 이걸
          // 되돌려주지 않으면 되살아난 문단이 앞 문단 서식을 뒤집어쓴다 (Task #2342).
          let removed_meta;
@@ -260,7 +259,7 @@
          match self.document.sections[section_idx].paragraphs[parent_para_idx]
              .controls
              .get_mut(control_idx)
-@@ -4802,19 +4908,28 @@
+@@ -4802,19 +4907,28 @@
                          HwpError::RenderError("지정된 표 컨트롤에 캡션이 없습니다".to_string())
                      })?;
                      let removed = cap.paragraphs.remove(cell_para_idx);
@@ -295,7 +294,7 @@
                  } else {
                      return Err(HwpError::RenderError(
                          "지정된 Shape 컨트롤에 텍스트 박스가 없습니다".to_string(),
-@@ -4824,8 +4939,11 @@
+@@ -4824,8 +4938,11 @@
              Some(Control::Picture(pic)) => {
                  if let Some(ref mut cap) = pic.caption {
                      let removed = cap.paragraphs.remove(cell_para_idx);
@@ -309,7 +308,7 @@
                  } else {
                      return Err(HwpError::RenderError(
                          "지정된 그림 컨트롤에 캡션이 없습니다".to_string(),
-@@ -6056,6 +6174,7 @@
+@@ -6056,6 +6173,7 @@
      ) -> Result<String, HwpError> {
          {
              let paras = self.get_cell_paragraphs_mut_by_path(section_idx, parent_para_idx, path)?;
@@ -317,7 +316,7 @@
              if start_para == end_para {
                  let count = end_offset.saturating_sub(start_offset);
                  if count > 0 {
-@@ -6101,11 +6220,15 @@
+@@ -6101,11 +6219,15 @@
              }
          }
  
@@ -337,7 +336,7 @@
  
          // dirty/이벤트는 delete_text_in_cell_by_path 와 동형(최외곽 컨트롤 기준).
          let outer_ctrl = path[0].0;
-@@ -6143,6 +6266,8 @@
+@@ -6143,6 +6265,8 @@
              .last()
              .ok_or_else(|| HwpError::RenderError("경로가 비어있습니다".to_string()))?;
          let cell_para_idx = last.2;
@@ -346,7 +345,7 @@
          // [#2755] 리플로우 후 재적용할 원본 vpos(분할 대상 문단 첫 seg).
          let mut split_origin_vpos: Option<i32> = None;
  
-@@ -6177,6 +6302,9 @@
+@@ -6177,6 +6301,9 @@
                      .first()
                      .map(|seg| seg.vertical_pos);
                  let mut new_para = cell.paragraphs[cell_para_idx].split_at(char_offset);
@@ -356,7 +355,7 @@
                  if let Some(meta) = restore_meta {
                      restore_para_meta(&mut new_para, meta, &self.document.doc_info.para_shapes);
                  }
-@@ -6263,6 +6391,7 @@
+@@ -6263,6 +6390,7 @@
          let mut merge_point = 0usize;
          // 사라지는 문단의 스코프 메타 — undo(split)가 되돌릴 값이다 (Task #2342).
          let mut removed_meta: Option<ParaMeta> = None;
@@ -364,7 +363,7 @@
          for (i, &(ctrl_idx, cell_idx, _cpi)) in path.iter().enumerate() {
              let table = match para.controls.get_mut(ctrl_idx) {
                  Some(Control::Table(t)) => t.as_mut(),
-@@ -6281,10 +6410,13 @@
+@@ -6281,10 +6409,13 @@
                      .first()
                      .map(|seg| seg.vertical_pos);
                  let removed = cell.paragraphs.remove(cell_para_idx);
