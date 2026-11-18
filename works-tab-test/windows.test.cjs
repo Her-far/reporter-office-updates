@@ -14,7 +14,7 @@ async function launch() {
   if (await welcome.isVisible()) await welcome.getByRole('button', { name: /^Skip$|건너뛰기/ }).click();
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 900));
 }
-const fixture = '<!doctype html><html lang="ko"><title>Works test fixture</title><body><h1>Works 통합 테스트</h1><label>일간 업무보고<textarea id="draft"></textarea></label><a id="escape" href="https://example.com/untrusted">외부 이동</a><script>window.visitCount=1;document.body.dataset.saved=localStorage.getItem("works-test-key")||"";</script></body></html>';
+const fixture = '<!doctype html><html lang="ko"><meta charset="utf-8"><title>Works test fixture</title><body><h1>Works 통합 테스트</h1><label>일간 업무보고<textarea id="draft"></textarea></label><a id="escape" href="https://example.com/untrusted">외부 이동</a><script>window.visitCount=1;document.body.dataset.saved=localStorage.getItem("works-test-key")||"";</script></body></html>';
 async function interceptWorks() { await app.context().route(WORKS_URL + '**', route => route.fulfill({ contentType: 'text/html', body: fixture })); }
 async function remotePage() { return until(() => app.context().pages().find(p => p.url().startsWith(WORKS_URL)), 'Works remote'); }
 async function hostPage() { return until(() => app.context().pages().find(p => p.url().endsWith('/works-tab/host.html')), 'Works host'); }
@@ -44,7 +44,9 @@ async function geometry() {
     const p = wc.getLastWebPreferences(); return { sandbox: p.sandbox, contextIsolation: p.contextIsolation, nodeIntegration: p.nodeIntegration, webSecurity: p.webSecurity, preload: p.preload || null, storagePath: wc.session.storagePath };
   }, WORKS_URL);
   assert(report.security.sandbox && report.security.contextIsolation && report.security.webSecurity); assert.equal(report.security.nodeIntegration, false); assert.equal(report.security.preload, null);
-  await remote.locator('#escape').click(); await remote.waitForTimeout(250); assert.equal(remote.url(), WORKS_URL); report.foreignNavigationBlocked = true;
+  // A deliberately cancelled native navigation never commits. Do not wait for a commit.
+  await remote.locator('#escape').click({ noWaitAfter: true }); await remote.waitForTimeout(250); assert.equal(remote.url(), WORKS_URL); report.foreignNavigationBlocked = true;
+  console.log('PASS: launch, profile isolation, disabled updater, remote security and navigation');
   await home.evaluate(() => window.aiOfficeTabs.activate('home'));
   assert.equal((await geometry()).views.find(v => v.url.startsWith(WORKS_URL)).visible, false);
   await home.getByRole('button', { name: '전기신문 Works 열기', exact: true }).click();
@@ -56,6 +58,7 @@ async function geometry() {
   assert.equal((await geometry()).views.find(v => v.url.startsWith(WORKS_URL)).visible, false);
   await home.evaluate(id => window.aiOfficeTabs.activate(id), id);
   assert.equal(await remote.locator('#draft').inputValue(), '오전 취재 일정 · 탭 이동 후에도 유지'); report.documentSwitch = true;
+  console.log('PASS: singleton Works tab and draft preservation across HWP document switching');
   report.resizes = [];
   for (const size of [[900, 650], [1500, 950], [1100, 750]]) {
     await app.evaluate(({ BrowserWindow }, size) => BrowserWindow.getAllWindows()[0].setContentSize(...size), size);
@@ -72,12 +75,14 @@ async function geometry() {
   assert.equal((await home.evaluate(() => window.aiOfficeTabs.list())).filter(t => t.kind === 'works').length, 0);
   await home.getByRole('button', { name: '전기신문 Works 열기', exact: true }).click(); remote = await remotePage();
   await remote.waitForFunction(() => document.body.dataset.saved === 'persisted-test-session'); report.restartSessionPreserved = true;
+  console.log('PASS: resize bounds, tab close, reopen and application restart persistence');
   const host = await hostPage();
   await app.context().unroute(WORKS_URL + '**'); await app.context().route(WORKS_URL + '**', route => route.abort('internetdisconnected'));
   await host.evaluate(() => window.worksTab.action('retry')); await host.locator('#retry').waitFor({ state: 'visible' });
   assert.equal((await geometry()).views.find(v => v.url.startsWith(WORKS_URL)).visible, false);
   await app.context().unroute(WORKS_URL + '**'); await interceptWorks(); await host.locator('#retry').click();
   await remote.locator('#draft').waitFor(); report.offlineRetry = true;
+  console.log('PASS: offline error and successful retry');
   // Read-only live smoke: login screen only; no company account credentials or data changes.
   await app.context().unroute(WORKS_URL + '**');
   await host.evaluate(() => window.worksTab.action('retry'));
