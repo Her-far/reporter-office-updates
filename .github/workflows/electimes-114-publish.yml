@@ -1,0 +1,74 @@
+name: Publish Electimes Office 1.0.14 automatic update
+on:
+  push:
+    branches: [publish/electimes-1.0.14]
+permissions:
+  contents: read
+concurrency:
+  group: electimes-production-release
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore and verify the approved installers
+        working-directory: release-checks/114
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '87366efcd89aa9b5e3b61eeb78e618b2188ed0f09cd0c9cb642d9f97ee0a4b8d  candidate.zip' | sha256sum -c
+          unzip -q candidate.zip
+          curl -fsSL --retry 3 https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Setup-1.0.12-x64.exe -o base.exe
+          url=https://deb.debian.org/debian/pool/main/n/nsis
+          curl -fsSL --retry 3 "$url/nsis_3.11-1_amd64.deb" -o nsis.deb
+          curl -fsSL --retry 3 "$url/nsis-common_3.11-1_all.deb" -o common.deb
+          printf '%s\n' 'e6eb6ffb70f0df09e95dedb2d2cf55ad3c2679f7c2ae357d0c00cc4c83178690  nsis.deb' '103a3284c1a5356efa0aba90fdfc391c3cde8e7df8726377cef0f98471584047  common.deb' | sha256sum -c
+          dpkg-deb -x nsis.deb nsis
+          dpkg-deb -x common.deb nsis
+          export MAKENSIS="$PWD/nsis/usr/bin/makensis" NSISDIR="$PWD/nsis/usr/share/nsis"
+          python3 restore.py base.exe
+          sha256sum -c ElectimesOffice-SHA256SUMS-1.0.14.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electimes-114-delivery
+          compression-level: 0
+          retention-days: 3
+          path: |
+            release-checks/114/ElectimesOffice-*.exe
+            release-checks/114/ElectimesOffice-SHA256SUMS-1.0.14.txt
+            release-checks/114/electimes-latest.json
+            release-checks/114/Office-1.0.14-source.bundle
+  windows:
+    needs: prepare
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: electimes-114-delivery
+      - shell: pwsh
+        run: |
+          curl.exe --fail --location --retry 3 --silent --show-error https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Setup-1.0.12-x64.exe -o base.exe
+          if($LASTEXITCODE -ne 0 -or (Get-FileHash base.exe).Hash -ne '8060e3e6e89bf33aed3d3a99fa00d1ea8e85cba22d42c3bc6693b47a38604431'){throw 'Base checksum mismatch'}
+          ./release-checks/114/validate.ps1
+  publish:
+    needs: windows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: electimes-114-delivery
+          path: delivery
+      - name: Publish verified assets then advance main feed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash release-checks/114/publish.sh
