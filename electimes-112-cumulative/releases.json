@@ -1,21 +1,5 @@
 [
   {
-    "build": 104,
-    "version": "1.0.4",
-    "name": "ElectimesOffice-Setup-1.0.4-x64.exe",
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.4/ElectimesOffice-Setup-1.0.4-x64.exe",
-    "size": 206487670,
-    "sha256": "889b72d7d47d9ce9a1c3a25868b6f121e1b61d794cf2dab9bcc67cda0608843e"
-  },
-  {
-    "build": 105,
-    "version": "1.0.5",
-    "name": "ElectimesOffice-Setup-1.0.5-x64.exe",
-    "url": "https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.5/ElectimesOffice-Setup-1.0.5-x64.exe",
-    "size": 206514270,
-    "sha256": "b764889217d97620e3e2d527f2176d4a25085924350b217c8c8ca15a2ef5de4c"
-  },
-  {
     "build": 106,
     "version": "1.0.6",
     "name": "ElectimesOffice-Setup-1.0.6-x64.exe",

@@ -50,8 +50,8 @@ try{
   $original=[IO.File]::ReadAllText($metadata)
   $asar=Join-Path $target 'resources/app.asar'
   $before=(Get-FileHash $asar).Hash
-  if($build -eq 104){
-   foreach($unsupported in @(103,113)){
+  if($build -eq 106){
+   foreach($unsupported in @(105,113)){
     [IO.File]::WriteAllText($metadata,('{"version":"1.0.'+($unsupported-100)+'","build":'+$unsupported+'}'),[Text.UTF8Encoding]::new($false))
     Install $patch $target 4
     if((Get-FileHash $asar).Hash -ne $before){throw 'Unsupported-base patch changed the app'}

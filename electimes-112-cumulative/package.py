@@ -1,6 +1,6 @@
 """Repackage the unchanged, published 1.0.12 payload for every supported base.
 
-The cumulative set is the UNION of differences from all published 1.0.4–1.0.11
+The cumulative set is the UNION of differences from all published 1.0.6–1.0.11
 installers, not a widened compatibility range on the old 1.0.11-only patch.
 """
 from pathlib import Path
@@ -49,7 +49,7 @@ def download(release):
     return dest
 
 
-assert [r['build'] for r in RELEASES] == list(range(104, 113))
+assert [r['build'] for r in RELEASES] == list(range(106, 113))
 extract(download(TARGET), STAGE)
 shutil.rmtree(STAGE / '$PLUGINSDIR')
 (STAGE / 'Uninstall.exe').unlink()
@@ -111,14 +111,14 @@ guard += '\n'.join("StrCmp $1 '" + json.dumps({'version': r['version'], 'build':
 guard += r'''
 wrong_base:
 IfSilent +2
-MessageBox MB_OK|MB_ICONEXCLAMATION "이 업데이트는 전기신문 Office 1.0.4~1.0.11용입니다. 이전 버전에는 전체 설치판을 사용해 주세요."
+MessageBox MB_OK|MB_ICONEXCLAMATION "이 업데이트는 전기신문 Office 1.0.6~1.0.11용입니다. 이전 버전에는 전체 설치판을 사용해 주세요."
 SetErrorLevel 4
 Abort
 base_ok:
 '''
 script = script[:start] + guard + script[end:]
 script = script.replace('전기신문 오피스 1.0.3~1.0.5를 1.0.12로 업데이트합니다.',
-                        '전기신문 오피스 1.0.4~1.0.11을 1.0.12로 누적 업데이트합니다.')
+                        '전기신문 오피스 1.0.6~1.0.11을 1.0.12로 누적 업데이트합니다.')
 script = script.replace('!insertmacro RegisterCompany\n!ifndef PATCH',
                         '!insertmacro RegisterCompany\nWriteUninstaller "$INSTDIR\\Uninstall.exe"\n!ifndef PATCH')
 script = script.replace('WriteUninstaller "$INSTDIR\\Uninstall.exe"\nCreateDirectory', 'CreateDirectory')
@@ -137,8 +137,8 @@ assert output.stat().st_size < 60*1024*1024, 'Cumulative update is unexpectedly 
 entry = {'url': TARGET['url'].rsplit('/', 1)[0] + '/' + output.name,
          'size': output.stat().st_size, 'sha256': sha(output)}
 feed = {'product': 'electimes-office', 'platform': 'win32-x64', 'version': '1.0.12', 'build': 112,
-        'minBuild': 104, 'maxBuild': 111,
-        'notes': ['1.0.4~1.0.11에서 중간 버전을 건너뛰어도 변경 파일만 받는 누적 업데이트를 제공합니다.',
+        'minBuild': 106, 'maxBuild': 111,
+        'notes': ['1.0.6~1.0.11에서 중간 버전을 건너뛰어도 변경 파일만 받는 누적 업데이트를 제공합니다.',
                   'Windows 인쇄 설정창의 배율 호환성과 HWP 인쇄창 표시를 개선했습니다.',
                   '기존 HWP 붙여넣기·줄 간격·문서 재열기 및 패널 수정이 모두 포함됩니다.'],
         'installer': entry,

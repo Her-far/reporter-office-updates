@@ -34,7 +34,7 @@ jobs:
         run: |
           node verify-selection.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Production client selects the wrong package' }
-      - name: Install over all eight versions and verify unchanged final payload
+      - name: Install over all six versions and verify unchanged final payload
         working-directory: electimes-112-cumulative
         shell: pwsh
         run: ./smoke.ps1
