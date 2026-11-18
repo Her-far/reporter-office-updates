@@ -55,7 +55,8 @@ function check(state,label){
     for(let i=0;i<3;i++)await page.keyboard.press('Control+z');
     await until(async()=>JSON.stringify((await read()).target.map(p=>p.text))===JSON.stringify(before.target.map(p=>p.text)),'undo restores text');
     entry.undo=await read();check(entry.undo,'undo');
-    await page.keyboard.press('Control+y');await until(async()=>((await read()).target[0].text.length>before.target[0].text.length),'redo paste');
+    // This HWP keymap reserves Ctrl+Y for deleting a line.
+    await page.keyboard.press('Control+Shift+z');await until(async()=>((await read()).target[0].text.length>before.target[0].text.length),'redo paste');
     entry.redo=await read();check(entry.redo,'redo');
     await page.screenshot({path:path.join(root,`cell-flow-${mode}-windows.png`)});
     await page.keyboard.press('Control+z');
