@@ -66,6 +66,6 @@ jobs:
             const tag = 'electimes-works-test-20261118.1';
             const {owner, repo} = context.repo;
             const {data: release} = await github.rest.repos.createRelease({owner, repo, tag_name: tag, target_commitish: context.sha, name: '전기신문 Office + Works · 별도 테스트판 1', prerelease: true, make_latest: 'false', body: 'Works를 문서 탭처럼 여는 Windows 테스트판입니다. 정식판 자동 업데이트 대상이 아닙니다. ZIP을 별도 폴더에 모두 압축 해제하고 Electimes Office Works Test.exe를 실행한 뒤, 상단 Works · 테스트를 누르세요. 기존 Works 계정으로 로그인합니다. Works에 저장·수정·삭제하는 내용은 실제 업무자료에 반영됩니다. 자세한 안내는 ZIP 안의 먼저 읽어주세요.txt를 확인하세요.\n\n기반: 정식 Office 1.0.12. 별도 프로필, 자동 업데이트 비활성화. Windows 탭 전환·입력 유지·창 크기·세션 유지·연결 재시도·원격 페이지 권한 격리 검사 통과. 실제 사용자 계정 로그인과 외부 푸시 수신은 자동 검사에 포함하지 않았습니다.'});
-            for (const name of ['ElectimesOffice-Works-Test-1-Windows-x64.zip', 'SHA256SUMS.txt', 'works-windows.json']) {
+            for (const name of ['ElectimesOffice-Works-Test-1-Windows-x64.zip', 'SHA256SUMS.txt', 'works-windows.json', 'works-office-windows.png']) {
               await github.rest.repos.uploadReleaseAsset({owner, repo, release_id: release.id, name, data: fs.readFileSync('works-tab-test/' + name)});
             }

@@ -93,6 +93,11 @@ async function geometry() {
   await host.evaluate(() => window.worksTab.action('retry'));
   await remote.getByText('전력에너지 산업의 밝은 미래', { exact: false }).first().waitFor({ timeout: 60000 });
   await remote.screenshot({ path: path.join(root, 'works-live-login-windows.png') });
+  const desktop = await app.evaluate(async ({ desktopCapturer, screen }) => {
+    const sources = await desktopCapturer.getSources({ types: ['screen'], thumbnailSize: screen.getPrimaryDisplay().size });
+    return sources[0].thumbnail.toPNG().toString('base64');
+  });
+  fs.writeFileSync(path.join(root, 'works-office-windows.png'), Buffer.from(desktop, 'base64'));
   report.liveLoginPage = true;
   report.pass = true; console.log(JSON.stringify(report, null, 2));
 })().catch(error => { report.error = String(error.stack || error); console.error(error); process.exitCode = 1; }).finally(async () => {

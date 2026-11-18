@@ -52,10 +52,14 @@ function register(deps) {
     }
   }
   function dispose(record) {
+    if (record.disposed) return;
+    record.disposed = true;
     if (current === record) current = null;
     const win = deps.window();
     if (win && !win.isDestroyed()) win.contentView.removeChildView(record.remote);
-    if (!record.remote.webContents.isDestroyed()) record.remote.webContents.close();
+    // Native window teardown can already have destroyed and cleared this view's contents.
+    const wc = record.remote.webContents;
+    if (wc && !wc.isDestroyed()) wc.close();
   }
   async function load() {
     const record = current;
@@ -91,7 +95,7 @@ function register(deps) {
       return { action: 'deny' };
     });
     wc.on('will-attach-webview', event => event.preventDefault());
-    wc.on('did-start-loading', () => state('불러오는 중…', false, true));
+    wc.on('did-start-loading', () => { if (current === record) state('불러오는 중…', false, true); });
     wc.on('did-finish-load', () => {
       if (current !== record || record.failed) return;
       record.loaded = true;
