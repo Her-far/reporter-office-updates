@@ -1,0 +1,11 @@
+node_modules/
+package-lock.json
+base.exe
+base/
+stage/
+package/
+dist/
+__pycache__/
+*-windows.json
+*-windows.png
+startup-*.txt
