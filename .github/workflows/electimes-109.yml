@@ -37,7 +37,7 @@ jobs:
           python rebuild.py --stage-only
           if ($LASTEXITCODE -ne 0) { throw 'Reconstruction failed' }
           $env:BASE_ASAR = Join-Path $PWD 'base-installer/resources/app.asar'
-          node --test workpanel/tests/update-confirm.test.cjs
+          node --test workpanel/tests/update-confirm.test.cjs workpanel/tests/update-handoff.test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Update confirmation regression failed' }
       - name: Verify fresh Google connection and live relay
         timeout-minutes: 4
@@ -74,6 +74,13 @@ jobs:
         run: |
           node update-download.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Update download regression failed' }
+      - name: Verify legacy and fixed UI install and relaunch
+        timeout-minutes: 10
+        working-directory: electimes-109
+        shell: pwsh
+        run: |
+          node update-install.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Real update install/relaunch failed' }
       - name: Package and inspect installer
         working-directory: electimes-109
         shell: pwsh
@@ -86,13 +93,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Upgrade base download failed' }
           if ((Get-FileHash upgrade-base.exe -Algorithm SHA256).Hash.ToLower() -ne '9609f2d5358965083f2c6c9d0e846bf9e4ccf51bb747144bb6d6d54c9e6ff9bd') { throw 'Upgrade base checksum mismatch' }
           ./smoke.ps1
-      - name: Verify legacy and fixed UI install and relaunch
-        timeout-minutes: 10
-        working-directory: electimes-109
-        shell: pwsh
-        run: |
-          node update-install.cjs
-          if ($LASTEXITCODE -ne 0) { throw 'Real update install/relaunch failed' }
       - name: Publish verified installer and update channel
         working-directory: electimes-109
         shell: pwsh

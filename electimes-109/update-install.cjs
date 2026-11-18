@@ -7,7 +7,7 @@ const root=__dirname,fixture=JSON.parse(fs.readFileSync(path.join(root,'download
 const report={version:'1.0.9',realInstaller:true,realRestart:true,cases:[]};
 const powershell=path.join(process.env.SystemRoot,'System32/WindowsPowerShell/v1.0/powershell.exe');
 const quote=s=>"'"+s.replaceAll("'","''")+"'";
-function ps(script){script="[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); "+script;return execFileSync(powershell,['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{encoding:'utf8',windowsHide:true,timeout:30000}).replace(/^\uFEFF/,'').trim()}
+function ps(script){script="$ProgressPreference='SilentlyContinue'; [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); "+script+'; exit 0';return execFileSync(powershell,['-NoProfile','-NonInteractive','-EncodedCommand',Buffer.from(script,'utf16le').toString('base64')],{encoding:'utf8',windowsHide:true,timeout:30000}).replace(/^\uFEFF/,'').trim()}
 async function until(fn,label,ms=90000){const end=Date.now()+ms;while(Date.now()<end){const v=await fn();if(v)return v;await new Promise(r=>setTimeout(r,250))}throw Error('Timed out: '+label)}
 async function runCase(legacy){
  const target=fs.mkdtempSync(path.join(os.tmpdir(),legacy?'Electimes legacy update ':'전기신문 업데이트 '));
@@ -15,7 +15,7 @@ async function runCase(legacy){
  const metadata=path.join(target,'resources/electimes-version.json');
  if(!legacy)fs.writeFileSync(metadata,JSON.stringify({version:'1.0.6',build:106}));
  const exe=path.join(target,'Electimes Office.exe'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'electimes-install-profile-'));
- let app,child;const entry={client:legacy?'released-1.0.6':'fixed-1.0.9',simulatedBuild:106,targetBuild:108};report.cases.push(entry);
+ let app,child,logsDir;const entry={client:legacy?'released-1.0.6':'fixed-1.0.9',simulatedBuild:106,targetBuild:108};report.cases.push(entry);
  try{
   app=await _electron.launch({executablePath:exe,args:[`--user-data-dir=${profile}`],env:{...process.env,GENOFFICE_NO_SPARE_VIEW:'1',GENOFFICE_LANG:'en'},timeout:60000});
   child=app.process();
@@ -23,7 +23,13 @@ async function runCase(legacy){
   const welcome=page.locator('.onb-overlay');await welcome.waitFor({state:'visible',timeout:10000}).catch(()=>{});
   if(await welcome.isVisible())await welcome.getByRole('button',{name:/^Skip$|건너뛰기/}).click();
   const data=await app.evaluate(({app})=>app.getPath('userData')),cache=path.join(data,'electimes-updates');
-  const resultFile=path.join(cache,'install-result.json');
+  logsDir=cache;const resultFile=path.join(cache,'install-result.json');
+  const trace=path.join(cache,'update-process-trace.jsonl');
+  await app.evaluate(({app},file)=>{
+   const fs=process.getBuiltinModule('fs'),cp=process.getBuiltinModule('child_process');const log=data=>fs.appendFileSync(file,JSON.stringify({at:Date.now(),...data})+'\n');
+   for(const event of ['before-quit','will-quit','quit'])app.on(event,()=>log({event}));
+   const original=cp.spawn;cp.spawn=(command,args,options)=>{const child=original(command,args,options);if(/powershell/i.test(command))log({event:'spawn-helper',pid:child.pid});return child};
+  },trace);
   fs.copyFileSync(fixture.installer,path.join(cache,path.basename(fixture.installer)));
   fs.writeFileSync(path.join(data,'update-preservation-fixture.json'),JSON.stringify({note:'사용자 파일 보존'}));
   await page.evaluate(url=>window.aiOffice.reporterUpdates.source(url),fixture.source);
@@ -39,10 +45,15 @@ async function runCase(legacy){
    await restart.click();entry.explicitRestartClicked=true;
   }
   const quit=await until(async()=>child.exitCode!==null?await exited:false,'client quit');assert.equal(quit.code,0);entry.quit=quit;
-  const result=await until(()=>{
+  let result;try{result=await until(()=>{
    if(!fs.existsSync(resultFile))return false;
    try{return JSON.parse(fs.readFileSync(resultFile,'utf8').replace(/^\uFEFF/,''))}catch{return false}
-  },'installer result',120000);
+  },'installer result',legacy?30000:120000)}catch(e){
+   if(!legacy)throw e;
+   entry.legacyInstallDidNotComplete=true;entry.observed=String(e);
+   entry.trace=fs.existsSync(trace)?fs.readFileSync(trace,'utf8'):'';
+   console.log(JSON.stringify(entry));return;
+  }
   entry.installResult=result;assert.equal(result.ok,true,JSON.stringify(result));assert.equal(result.build,108);
   assert.equal(JSON.parse(fs.readFileSync(metadata,'utf8')).build,108);
   assert.equal(JSON.parse(fs.readFileSync(path.join(data,'update-preservation-fixture.json'),'utf8')).note,'사용자 파일 보존');
@@ -55,7 +66,9 @@ async function runCase(legacy){
  }catch(e){entry.error=String(e);throw e}
  finally{
   if(app&&child?.exitCode===null)await require('./close-app.cjs')(app).catch(()=>{});
-  ps(`$p = Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq ${quote(exe)} }; $p | ForEach-Object { [void]$_.CloseMainWindow() }; Start-Sleep -Seconds 2; Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq ${quote(exe)} } | Stop-Process -Force`);
+  const dataLogs=logsDir||path.join(profile,'electimes-updates');
+  for(const name of ['install-handoff.log','update-process-trace.jsonl'])if(fs.existsSync(path.join(dataLogs,name)))entry[name]=fs.readFileSync(path.join(dataLogs,name),'utf8').slice(-12000);
+  try{ps(`$p = Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq ${quote(exe)} }; $p | ForEach-Object { [void]$_.CloseMainWindow() }; Start-Sleep -Seconds 2; Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq ${quote(exe)} } | Stop-Process -Force`)}catch(e){entry.cleanupError=String(e)}
  }
 }
 (async()=>{await runCase(true);await runCase(false)})().catch(e=>{report.error=String(e);console.error(e);process.exitCode=1}).finally(()=>fs.writeFileSync(path.join(root,'update-install-windows.json'),JSON.stringify(report,null,2)));

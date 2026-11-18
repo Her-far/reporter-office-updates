@@ -19,9 +19,18 @@ main=exact(main,'function registerHomeIpc() {',`function registerHomeIpc() {
     openDocument: file => openDocumentPath(file)
   });`);
 main=exact(main,'  createShellWindow();\n  installBackToHomeItems();',"  createShellWindow();\n  require('./work-panel/main.cjs').attach();\n  installBackToHomeItems();");
+main=exact(main,'function cancelUpdateRestart() {\n  reporterUpdateRestartRequested = false;','function cancelUpdateRestart() {\n  reporterUpdateRestartRequested = false;\n  require("./reporter-update-handoff.cjs").cancel();');
 new vm.Script(main);rep.set('out/main/index.js',Buffer.from(main));
 let updater=asar.content(a,'out/main/reporter-updater.cjs').toString();
 updater=exact(updater,'let version = { version: "1.0.6", build: 106 }','let version = { version: "1.0.9", build: 109 }');
+updater=exact(updater,'      restart.request();\n      import_electron2.app.quit();',`      await require('./reporter-update-handoff.cjs').prepare({dir,script:installerScript(process.pid,installer,(0, import_node_path2.dirname)(process.execPath),process.execPath,resultFile,state.release.build,state.release.installer.sha256)});
+      restart.request();
+      import_electron2.app.quit();`);
+const quitStart=updater.indexOf('    const script = installerScript(',updater.indexOf('import_electron2.app.on("will-quit"'));
+const quitEnd=updater.indexOf('    child.unref();',quitStart)+'    child.unref();'.length;
+if(quitStart<0||quitEnd<quitStart)throw Error('Update shutdown handoff anchor missing');
+updater=exact(updater,updater.slice(quitStart,quitEnd),'    require("./reporter-update-handoff.cjs").commit();');
+rep.set('out/main/reporter-update-handoff.cjs',fs.readFileSync(path.join(__dirname,'update-handoff.cjs')));
 new vm.Script(updater);rep.set('out/main/reporter-updater.cjs',Buffer.from(updater));
 let updateRendererCount=0;
 for(const [name] of asar.filesOf(a.header)) {
