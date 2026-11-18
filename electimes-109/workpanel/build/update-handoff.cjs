@@ -32,7 +32,10 @@ Remove-Item -LiteralPath ${ps(job.ready)}, ${ps(job.commit)} -ErrorAction Silent
  fs.writeFileSync(job.script,'\uFEFF'+gate+script,'utf8');
  const fd=fs.openSync(job.log,'w');
  try{
-  job.child=cp.spawn(path.join(process.env.SystemRoot??'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',job.script],{detached:true,stdio:['ignore',fd,fd],windowsHide:true});
+  // Windows PowerShell 5 can exit without evaluating any code when started
+  // with DETACHED_PROCESS. File handles + unref keep this helper independent
+  // of the parent's event loop without that incompatible creation flag.
+  job.child=cp.spawn(path.join(process.env.SystemRoot??'C:\\Windows','System32','WindowsPowerShell','v1.0','powershell.exe'),['-NoLogo','-NoProfile','-NonInteractive','-ExecutionPolicy','Bypass','-File',job.script],{stdio:['ignore',fd,fd],windowsHide:true});
   job.child.on('error',error=>{job.error=error;fs.appendFileSync(job.log,'Helper startup: '+String(error)+'\n')});
   job.child.on('exit',(code,signal)=>{if(!job.committed)fs.appendFileSync(job.log,JSON.stringify({code,signal})+'\n')});job.child.unref();
  }finally{fs.closeSync(fd)}

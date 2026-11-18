@@ -80,6 +80,10 @@ jobs:
         run: |
           node find-focus.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Find keyboard focus regression failed' }
+      - name: Reproduce special-character paste and upper-lower blank deletion
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        working-directory: electimes-109
+        run: node line-spacing.cjs
       - name: Verify long HWP selection across pages and tables
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         working-directory: electimes-109
