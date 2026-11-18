@@ -27,16 +27,33 @@ const methods={
  bodySelectionRects(start,end){
   return this.bodySelectionRanges(start,end).flatMap(args=>this.wasm.getSelectionRects(...args)).concat(this.bodyTableRectsInRange(start,end));
  },
+ bodyHtmlFragment(html){
+  const start=html.indexOf('<!--StartFragment-->'),end=html.indexOf('<!--EndFragment-->');
+  return start>=0&&end>start?html.slice(start+20,end):html;
+ },
+ bodySelectionHtml(sec,fromPara,fromChar,toPara,toChar){
+  const tables=this.bodyTableAnchors().filter(t=>t.sec===sec&&(t.para>fromPara||t.para===fromPara&&t.off>=fromChar)&&(t.para<toPara||t.para===toPara&&t.off<toChar)).sort((a,b)=>a.para-b.para||a.off-b.off);
+  if(!tables.length)return this.wasm.exportSelectionHtml(sec,fromPara,fromChar,toPara,toChar);
+  const fragment=html=>this.bodyHtmlFragment(html);
+  const parts=[];let para=fromPara,char=fromChar;
+  for(const table of tables){
+   if(table.para>para||table.off>char)parts.push(fragment(this.wasm.exportSelectionHtml(sec,para,char,table.para,table.off)));
+   parts.push(fragment(this.wasm.exportControlHtml(sec,table.para,table.ci,'')));
+   para=table.para;char=table.off+1;
+  }
+  if(toPara>para||toChar>char)parts.push(fragment(this.wasm.exportSelectionHtml(sec,para,char,toPara,toChar)));
+  return '<html><body>\n<!--StartFragment-->\n'+parts.join('\n')+'\n<!--EndFragment-->\n</body></html>';
+ },
  copyBodySections(event,start,end){
   const text=[],html=[];
   for(const args of this.bodySelectionRanges(start,end)){
    this.wasm.copySelection(...args);text.push(this.wasm.getClipboardText());
-   html.push(this.wasm.exportSelectionHtml(...args));
+   html.push(this.bodyHtmlFragment(this.bodySelectionHtml(...args)));
   }
   // Do not mark this as a single-section internal clipboard: its last section
   // alone is in the engine clipboard. HTML retains tables and formatting.
   event.clipboardData?.setData('text/plain',text.join('\n'));
-  event.clipboardData?.setData('text/html',html.join('\n'));
+  event.clipboardData?.setData('text/html','<html><body>\n<!--StartFragment-->\n'+html.join('\n')+'\n<!--EndFragment-->\n</body></html>');
  }
 };
 function patch(modules,exact){
@@ -47,6 +64,7 @@ function patch(modules,exact){
   s=exact(s,'const e=this.hitTestFromClientPoint(this.dragLastClientX,this.dragLastClientY);if(e&&e.paragraphIndex<4294967040)',`const box=this.container.getBoundingClientRect();const e=this.bodyDragHit(this.hitTestFromClientPoint(this.dragLastClientX,Math.max(box.top+1,Math.min(box.top+this.container.clientHeight-1,this.dragLastClientY))));if(e&&e.paragraphIndex<4294967040)`);
   s=exact(s,'this.container.scrollTop!==t&&(this.updateTextSelectionDragFromPointer(),this.dragAutoScrollRafId=requestAnimationFrame(()=>this.runTextSelectionDragAutoScroll()))','this.updateTextSelectionDragFromPointer(),this.dragAutoScrollRafId=requestAnimationFrame(()=>this.runTextSelectionDragAutoScroll())');
   s=exact(s,'s=this.wasm.getSelectionRects(i.sectionIndex,i.paragraphIndex,i.charOffset,o.paragraphIndex,o.charOffset),s=s.concat(this.bodyTableRectsInRange(i,o))','s=this.bodySelectionRects(i,o)');
+  s=exact(s,'o=this.wasm.exportSelectionHtml(t.sectionIndex,t.paragraphIndex,t.charOffset,n.paragraphIndex,n.charOffset)','o=this.bodySelectionHtml(t.sectionIndex,t.paragraphIndex,t.charOffset,n.paragraphIndex,n.charOffset)');
   const copy='const{start:t,end:n}=e;try{';
   const call='this.wasm.copySelection(t.sectionIndex,t.paragraphIndex,t.charOffset,n.paragraphIndex,n.charOffset)';
   const callIndex=s.indexOf(call),start=s.lastIndexOf(copy,callIndex);if(start<0||callIndex-start>600)throw Error('Copy handler changed');

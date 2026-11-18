@@ -6,6 +6,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+  actions: read
 concurrency:
   group: electimes-production-release
   cancel-in-progress: true
@@ -16,6 +17,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/cache@v4
+        id: core
+        with:
+          path: electimes-109/engine-built
+          key: hwp-109-engine-rust1931-bindgen02127-${{ hashFiles('electimes-109/engine/*.py') }}
+      - name: Reuse the identical verified engine build
+        id: verified_core
+        if: steps.core.outputs.cache-hit != 'true' && hashFiles('electimes-109/engine/*.py') == 'b6d8f586ed1bd37f0a41c185c8d6f028860e7c2025e0e873562b13827fcbccd9'
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: electimes-109-hwp-engine
+          path: electimes-109/engine-built
+          run-id: 44221051377
+          github-token: ${{ github.token }}
+      - name: Verify reused engine identity
+        if: steps.verified_core.outcome == 'success'
+        shell: bash
+        run: |
+          echo '8a8784288eebf89ec91000ad52246b36b0ef16ac0158890d44f061b69c39736d  electimes-109/engine-built/rhwp_bg.wasm' | sha256sum --check
+          cmp electimes-109/engine/apply-table-zones.py electimes-109/engine-built/source-patches/apply-table-zones.py
+      - uses: actions/cache@v4
+        if: steps.core.outputs.cache-hit != 'true' && steps.verified_core.outcome != 'success'
         with:
           path: |
             ~/.cargo/registry
@@ -24,6 +47,7 @@ jobs:
           key: hwp-087-vendor11-${{ hashFiles('electimes-109/engine/*.py') }}
           restore-keys: hwp-087-vendor11-
       - name: Install pinned Rust and WASM binding tools
+        if: steps.core.outputs.cache-hit != 'true' && steps.verified_core.outcome != 'success'
         shell: bash
         run: |
           rustup toolchain install 1.93.1 --profile minimal --target wasm32-unknown-unknown
@@ -32,6 +56,7 @@ jobs:
           tar -xf wasm-bindgen.tar.gz
           echo "$PWD/wasm-bindgen-0.2.127-x86_64-unknown-linux-musl" >> "$GITHUB_PATH"
       - name: Build pinned HWP engine with preserved vendor patches
+        if: steps.core.outputs.cache-hit != 'true' && steps.verified_core.outcome != 'success'
         run: python electimes-109/engine/build-core.py engine-work electimes-109/engine-built
       - uses: actions/upload-artifact@v4
         with:
@@ -147,6 +172,11 @@ jobs:
         run: |
           node update-install.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Real update install/relaunch failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-109-native-validation
+          path: electimes-109/*-windows.json
       - name: Package and inspect installer
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         working-directory: electimes-109
@@ -167,7 +197,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create electimes-v1.0.9 ElectimesOffice-Setup-1.0.9-x64.exe ElectimesOffice-SHA256SUMS-1.0.9.txt windows-smoke.json doc-reopen-windows.json find-focus-windows.json update-download-windows.json update-install-windows.json panel-layout-windows.json workpanel-windows.json google-connect-windows.json --title '전기신문 Office 1.0.9 — 업데이트·패널·찾기 수정' --notes-file release-notes.txt --latest=false
+          gh release create electimes-v1.0.9 ElectimesOffice-Setup-1.0.9-x64.exe ElectimesOffice-SHA256SUMS-1.0.9.txt windows-smoke.json doc-reopen-windows.json find-focus-windows.json update-download-windows.json update-install-windows.json panel-layout-windows.json workpanel-windows.json google-connect-windows.json mail-links-windows.json hwp-drag-windows.json hwp-engine-windows.json --title '전기신문 Office 1.0.9 — 업데이트·패널·문서 편집 수정' --notes-file release-notes.txt --latest=false
           if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
           # Update only the company channel; retain concurrent repository work.
           $feed = Get-Content -Raw electimes-latest.json

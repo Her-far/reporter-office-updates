@@ -23,6 +23,13 @@ main=exact(main,'function cancelUpdateRestart() {\n  reporterUpdateRestartReques
 new vm.Script(main);rep.set('out/main/index.js',Buffer.from(main));
 let updater=asar.content(a,'out/main/reporter-updater.cjs').toString();
 updater=exact(updater,'let version = { version: "1.0.6", build: 106 }','let version = { version: "1.0.9", build: 109 }');
+// Windows PowerShell may inherit a PowerShell 7 module path. Compute the same
+// mandatory SHA-256 directly with .NET instead of depending on Get-FileHash.
+updater=exact(updater,'  if ((Get-FileHash -LiteralPath ${ps(installer)} -Algorithm SHA256).Hash -ne ${ps(expectedSha)})',`  $hashAlgorithm = [Security.Cryptography.SHA256]::Create()
+  $hashStream = [IO.File]::OpenRead(\${ps(installer)})
+  try { $installerHash = [BitConverter]::ToString($hashAlgorithm.ComputeHash($hashStream)).Replace('-', '').ToLowerInvariant() }
+  finally { $hashStream.Dispose(); $hashAlgorithm.Dispose() }
+  if ($installerHash -ne \${ps(expectedSha)})`);
 updater=exact(updater,'      restart.request();\n      import_electron2.app.quit();',`      await require('./reporter-update-handoff.cjs').prepare({dir,script:installerScript(process.pid,installer,(0, import_node_path2.dirname)(process.execPath),process.execPath,resultFile,state.release.build,state.release.installer.sha256)});
       restart.request();
       import_electron2.app.quit();`);

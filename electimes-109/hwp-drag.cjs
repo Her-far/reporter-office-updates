@@ -26,5 +26,5 @@ async function until(fn,label,ms=60000){const end=Date.now()+ms;while(Date.now()
  await page.mouse.up();await page.keyboard.press('Control+c');
  const copied=await app.evaluate(({clipboard})=>({text:clipboard.readText(),html:clipboard.readHTML()}));
  assert.match(copied.text,/LINE_000/);assert.match(copied.text,/LINE_159/);for(let i=0;i<160;i++)assert(copied.text.includes('LINE_'+String(i).padStart(3,'0')),'Missing line '+i);
- assert.match(copied.html,/TABLE_15/);report.fullDragAcrossPages=true;report.allParagraphsCopied=true;report.tablesRetainedInClipboard=true;console.log(JSON.stringify(report));
+ for(const n of [15,45,75,105,135])assert(copied.html.includes('TABLE_'+n),'Missing table '+n);report.fullDragAcrossPages=true;report.allParagraphsCopied=true;report.tablesRetainedInClipboard=true;console.log(JSON.stringify(report));
 })().catch(async e=>{report.error=String(e);if(frame)try{report.state=await frame.evaluate(()=>window.__electimesInspect())}catch{}console.error(e);process.exitCode=1}).finally(async()=>{fs.writeFileSync(path.join(root,'hwp-drag-windows.json'),JSON.stringify(report,null,2));await require('./close-app.cjs')(app);restore()});
