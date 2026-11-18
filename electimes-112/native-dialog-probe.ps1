@@ -13,17 +13,18 @@ public static class NativePrintProbe {
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr h,StringBuilder s,int n);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h,StringBuilder s,int n);
+ [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr h,uint cmd);
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
  [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT r);
  [DllImport("user32.dll")] public static extern IntPtr GetWindowDpiAwarenessContext(IntPtr h);
  [DllImport("user32.dll")] public static extern int GetAwarenessFromDpiAwarenessContext(IntPtr h);
  [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);
- public class Window {public long handle;public string title,kind;public int awareness;public uint dpi;public RECT rect;public List<Window> children;}
+ public class Window {public long handle;public string title,kind;public int awareness;public uint dpi;public bool visible;public RECT rect;public List<Window> children;public Window owner;}
  public static Window Read(IntPtr h,bool children=false) {
   var s=new StringBuilder(512); GetWindowText(h,s,512);var c=new StringBuilder(128);GetClassName(h,c,128);RECT r;GetWindowRect(h,out r);
-  var w=new Window{handle=h.ToInt64(),title=s.ToString(),kind=c.ToString(),rect=r,awareness=GetAwarenessFromDpiAwarenessContext(GetWindowDpiAwarenessContext(h)),dpi=GetDpiForWindow(h)};
-  if(children){w.children=new List<Window>();EnumChildWindows(h,(a,b)=>{if(IsWindowVisible(a))w.children.Add(Read(a));return true;},IntPtr.Zero);}return w;
+  var w=new Window{handle=h.ToInt64(),title=s.ToString(),kind=c.ToString(),rect=r,awareness=GetAwarenessFromDpiAwarenessContext(GetWindowDpiAwarenessContext(h)),dpi=GetDpiForWindow(h),visible=IsWindowVisible(h)};
+  if(children){var owner=GetWindow(h,4);if(owner!=IntPtr.Zero)w.owner=Read(owner);w.children=new List<Window>();EnumChildWindows(h,(a,b)=>{if(IsWindowVisible(a))w.children.Add(Read(a));return true;},IntPtr.Zero);}return w;
  }
  public static Window[] Dialogs(int pid) {
   var list=new List<Window>();EnumWindows((h,x)=>{uint p;GetWindowThreadProcessId(h,out p);if(p==pid&&IsWindowVisible(h)){var w=Read(h,true);if(w.kind=="#32770")list.Add(w);}return true;},IntPtr.Zero);return list.ToArray();

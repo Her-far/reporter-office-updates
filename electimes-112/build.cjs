@@ -28,11 +28,17 @@ main=exact(main,'const printWindow$1 = () => new require$$1$1.BrowserWindow({ sh
 main=exact(main,'await printJobToPrinter(printJob, printWindow$1);',`const printOwner = require$$1$1.BrowserWindow.fromWebContents(e.sender) ?? require$$1$1.BrowserWindow.getFocusedWindow();
         await printJobToPrinter(printJob, () => printWindow$1(printOwner, true));`);
 main=exact(main,`function printJobToPrinter(job, createWindow) {
-  return withPrintWindow(job, createWindow, (win2) => new Promise((resolve2, reject) => {
-    win2.webContents.print(`,`function printJobToPrinter(job, createWindow) {
-  return withPrintWindow(job, createWindow, (win2) => new Promise((resolve2, reject) => {
-    if (process.platform === "win32") { win2.show(); win2.focus(); }
-    win2.webContents.print(`);
+  return withPrintWindow(
+    job,
+    createWindow,
+    (win2) => new Promise((resolve2, reject) => {
+      win2.webContents.print(`,`function printJobToPrinter(job, createWindow) {
+  return withPrintWindow(
+    job,
+    createWindow,
+    (win2) => new Promise((resolve2, reject) => {
+      if (process.platform === "win32") { win2.show(); win2.focus(); }
+      win2.webContents.print(`);
 new vm.Script(main);replacements.set('out/main/index.js',Buffer.from(main));
 replacements.set('out/main/print-compat.cjs',fs.readFileSync(path.join(__dirname,'print-compat.cjs')));
 pkg.version='1.0.12';pkg.electimesModificationNotice='Windows printer settings use a consistent legacy-dialog DPI context. HWP print owner remains visible. All 1.0.11 fixes and original notices retained.';
