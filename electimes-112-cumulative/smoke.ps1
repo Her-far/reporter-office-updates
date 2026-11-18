@@ -38,7 +38,11 @@ function Startup([string]$target,[int]$build) {
   if([IO.File]::ReadAllText($marker) -ne '사용자 설정과 메모 보존'){throw 'Profile marker changed'}
  }finally{
   if(!$app.HasExited){$app.CloseMainWindow()|Out-Null;Start-Sleep -Seconds 2;$app.Refresh();if(!$app.HasExited){Stop-Process -Id $app.Id -Force}}
-  Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $target 'Electimes Office.exe') } | Stop-Process -Force
+  $remaining=Get-Process -Name 'Electimes Office' -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $target 'Electimes Office.exe') }
+  foreach($process in $remaining){
+   Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
+   $process.WaitForExit(10000)|Out-Null
+  }
  }
 }
 try{
@@ -74,7 +78,12 @@ try{
   Startup $target $build
   $report.cases+=@{fromBuild=$build;toBuild=112;installed=$true;manifestVerified=$true;startup=$true;userFilePreserved=$true;migrationBackupPreserved=$true}
   Write-Host "Verified real installation and startup: $build -> 112"
-  Remove-Item -LiteralPath $target -Recurse -Force
+  # Chromium children and antivirus may briefly retain a locale-file handle
+  # after the main window exits. Wait for those handles before fixture cleanup.
+  for($attempt=0;$attempt -lt 10;$attempt++){
+   try{Remove-Item -LiteralPath $target -Recurse -Force;break}
+   catch{if($attempt -eq 9){throw};Start-Sleep -Seconds 1}
+  }
  }
 }finally{
  $report|ConvertTo-Json -Depth 8|Set-Content (Join-Path $root 'cumulative-install-windows.json') -Encoding UTF8
