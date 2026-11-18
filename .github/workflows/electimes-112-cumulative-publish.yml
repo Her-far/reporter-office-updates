@@ -1,0 +1,112 @@
+name: Publish verified Electimes Office 1.0.12 cumulative update
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/electimes-112-cumulative-publish.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: electimes-production-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require successful validation of the exact cumulative package code
+        id: candidate
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $sha = '1bb2de5463653536a4a4a42c79db11832f15c01f'
+          $runs = gh api "repos/Her-far/reporter-office-updates/actions/workflows/electimes-112-cumulative.yml/runs?head_sha=$sha&per_page=10" | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot read candidate validation' }
+          $run = $runs.workflow_runs | Where-Object { $_.head_sha -eq $sha -and $_.conclusion -eq 'success' -and $_.path -eq '.github/workflows/electimes-112-cumulative.yml' } | Select-Object -First 1
+          if (-not $run) { throw 'The expected candidate did not pass validation' }
+          "run_id=$($run.id)" >> $env:GITHUB_OUTPUT
+      - uses: actions/download-artifact@v4
+        with:
+          name: electimes-112-cumulative-validation
+          run-id: ${{ steps.candidate.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: candidate
+      - name: Verify installer integrity and every supported upgrade path
+        shell: pwsh
+        run: |
+          $feed = Get-Content -Raw candidate/electimes-latest.json | ConvertFrom-Json
+          $install = Get-Content -Raw candidate/cumulative-install-windows.json | ConvertFrom-Json
+          $selection = Get-Content -Raw candidate/cumulative-selection-windows.json | ConvertFrom-Json
+          $package = Get-Content -Raw candidate/cumulative-package-windows.json | ConvertFrom-Json
+          if ($feed.build -ne 112 -or $feed.version -ne '1.0.12' -or $feed.minBuild -ne 106 -or $feed.maxBuild -ne 111) { throw 'Unexpected compatibility range' }
+          if ($feed.fullInstaller.sha256 -ne '8060e3e6e89bf33aed3d3a99fa00d1ea8e85cba22d42c3bc6693b47a38604431') { throw 'The full release was changed' }
+          if (-not $package.payloadUnchanged -or $package.verifiedPayloadFiles -ne 2929 -or $package.bases.Count -ne 6) { throw 'Published payload preservation was not verified' }
+          if ($install.cases.Count -ne 6 -or -not $install.wrongBaseRejected -or -not $install.newerVersionRejected -or -not $install.repeatInstall) { throw 'Installer validation incomplete' }
+          if (-not $selection.productionClientSelectionPassed -or $selection.cases.Count -ne 6) { throw 'Old client selection validation incomplete' }
+          foreach ($build in 106..111) {
+            $case = $install.cases | Where-Object { $_.fromBuild -eq $build }
+            $client = $selection.cases | Where-Object { $_.build -eq $build }
+            if (-not $case.installed -or -not $case.manifestVerified -or -not $case.startup -or -not $case.userFilePreserved -or -not $case.migrationBackupPreserved -or $client.type -ne 'patch') { throw "Upgrade validation failed for $build" }
+          }
+          $name = ($feed.installer.url -split '/')[-1]
+          if ($name -ne 'ElectimesOffice-Update-1.0.12-Cumulative-x64.exe') { throw 'Unexpected asset name' }
+          $file = Get-Item (Join-Path candidate $name)
+          if ($file.Length -ne $feed.installer.size -or $file.Length -ge 62914560 -or (Get-FileHash $file.FullName).Hash.ToLower() -ne $feed.installer.sha256) { throw 'Cumulative installer integrity failure' }
+      - name: Add the cumulative release asset and update the existing version-112 feed
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --ff-only origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot refresh release channel' }
+          $current = Get-Content -Raw electimes-latest.json | ConvertFrom-Json
+          if ($current.build -ne 112 -or $current.fullInstaller.sha256 -ne '8060e3e6e89bf33aed3d3a99fa00d1ea8e85cba22d42c3bc6693b47a38604431') { throw 'Release channel moved to a different application release' }
+          $release = gh api repos/Her-far/reporter-office-updates/releases/tags/electimes-v1.0.12 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $release.draft -or $release.prerelease) { throw 'Expected published 1.0.12 release not found' }
+          $files = @('ElectimesOffice-Update-1.0.12-Cumulative-x64.exe','Cumulative-1.0.12-SHA256SUMS.txt','cumulative-install-windows.json','cumulative-selection-windows.json','cumulative-package-windows.json')
+          foreach ($name in $files) {
+            $file = Get-Item (Join-Path candidate $name)
+            $sha = (Get-FileHash $file.FullName).Hash.ToLower()
+            $existing = $release.assets | Where-Object { $_.name -eq $name }
+            if ($existing) {
+              if ($existing.size -ne $file.Length -or $existing.digest -ne ('sha256:'+$sha)) { throw "Existing asset does not match: $name" }
+            } else {
+              gh release upload electimes-v1.0.12 $file.FullName
+              if ($LASTEXITCODE -ne 0) { throw "Asset publication failed: $name" }
+            }
+          }
+          gh release edit electimes-v1.0.12 --notes-file release-checks/cumulative-112-notes.txt
+          if ($LASTEXITCODE -ne 0) { throw 'Release notes update failed' }
+          $feed = Get-Content -Raw candidate/electimes-latest.json
+          [IO.File]::WriteAllText((Join-Path $PWD 'electimes-latest.json'),$feed,[Text.UTF8Encoding]::new($false))
+          git add electimes-latest.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m 'release: serve compact cumulative updates to Electimes Office 1.0.6 through 1.0.11'
+            git push origin HEAD:main
+            if ($LASTEXITCODE -ne 0) { throw 'Cumulative update feed publication failed' }
+          }
+      - name: Verify a real 1.0.10 client displays and downloads the small published update
+        shell: pwsh
+        run: |
+          npm install --prefix release-checks --no-save --ignore-scripts playwright@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'UI test dependency installation failed' }
+          curl.exe --fail --location --retry 3 --silent --show-error -o client-110.exe https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.10/ElectimesOffice-Setup-1.0.10-x64.exe
+          if ($LASTEXITCODE -ne 0 -or (Get-FileHash client-110.exe).Hash.ToLower() -ne '91a7b5b39254c8345588cfefb28d386a96c882bdeec352edd8aaf6a0040e066e') { throw 'Published 1.0.10 client checksum mismatch' }
+          & 'C:\Program Files\7-Zip\7z.exe' x client-110.exe -oclient-110 -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Client extraction failed' }
+          node release-checks/cumulative-112-ui.cjs 'client-110/Electimes Office.exe' candidate/electimes-latest.json
+          if ($LASTEXITCODE -ne 0) { throw 'Published update UI verification failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-112-cumulative-published-ui
+          path: release-checks/cumulative-published-ui.json
