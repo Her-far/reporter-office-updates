@@ -1,0 +1,69 @@
+name: Publish verified Electimes Office 1.0.12
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/electimes-112-publish.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: electimes-production-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: windows-2022
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify the candidate validation run
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $run = gh api repos/Her-far/reporter-office-updates/actions/runs/44247278241 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or $run.conclusion -ne 'success' -or $run.head_sha -ne 'c85ea17acb4d78d0bc482526b8386ca06bddc0c1' -or $run.path -ne '.github/workflows/electimes-112.yml') { throw 'Candidate validation is not the expected successful run' }
+      - uses: actions/download-artifact@v4
+        with:
+          name: electimes-112-native-validation
+          run-id: 44247278241
+          github-token: ${{ github.token }}
+          path: candidate
+      - name: Verify downloaded installers and test evidence
+        shell: pwsh
+        run: |
+          $feed = Get-Content -Raw candidate/electimes-latest.json | ConvertFrom-Json
+          $print = Get-Content -Raw candidate/print-windows.json | ConvertFrom-Json
+          $install = Get-Content -Raw candidate/windows-smoke.json | ConvertFrom-Json
+          if ($feed.version -ne '1.0.12' -or $feed.build -ne 112 -or $feed.minBuild -ne 111 -or $feed.maxBuild -ne 111) { throw 'Unexpected release version' }
+          if ($print.error -or $print.cases.Count -ne 4) { throw 'Native print validation is incomplete' }
+          foreach ($case in $print.cases) {
+            if (-not $case.initial.installed -or $case.state.inside -ne 0 -or $case.state.restored -ne 1 -or $case.state.before -ne $case.state.after -or $case.canceled.ok) { throw 'Native print validation failed' }
+          }
+          if (-not $print.cases[0].hwp.visibleOwner -or $print.cases[0].hwp.state.calls -ne 2 -or $print.cases[0].hwp.state.restored -ne 2) { throw 'HWP print path validation is missing' }
+          if (-not $install.fullInstall -or -not $install.patchUpdate -or -not $install.wrongBaseRejected -or -not $install.manifestVerified -or -not $install.startup) { throw 'Installer validation is incomplete' }
+          foreach ($entry in @($feed.installer,$feed.fullInstaller)) {
+            $name = ($entry.url -split '/')[-1]
+            $file = Get-Item (Join-Path candidate $name)
+            if ($file.Length -ne $entry.size -or (Get-FileHash $file.FullName -Algorithm SHA256).Hash.ToLower() -ne $entry.sha256) { throw "Installer integrity failure: $name" }
+          }
+          if ($feed.installer.size -ge 41943040) { throw 'Compact update is unexpectedly large' }
+      - name: Publish installers and switch the automatic update feed
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git pull --ff-only origin main
+          if ($LASTEXITCODE -ne 0) { throw 'Cannot refresh release channel' }
+          $current = Get-Content -Raw electimes-latest.json | ConvertFrom-Json
+          if ($current.build -ge 112) { throw 'Release channel already has this or a newer version' }
+          gh release create electimes-v1.0.12 candidate/ElectimesOffice-Setup-1.0.12-x64.exe candidate/ElectimesOffice-Update-1.0.12-x64.exe candidate/ElectimesOffice-SHA256SUMS-1.0.12.txt candidate/print-windows.json candidate/package-windows.json candidate/windows-smoke.json --target c85ea17acb4d78d0bc482526b8386ca06bddc0c1 --title '전기신문 Office 1.0.12 — 인쇄 설정창 호환성 개선' --notes-file electimes-112/release-notes.txt --latest=false
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed' }
+          $feed = Get-Content -Raw candidate/electimes-latest.json
+          [IO.File]::WriteAllText((Join-Path $PWD 'electimes-latest.json'),$feed,[Text.UTF8Encoding]::new($false))
+          git add electimes-latest.json
+          git commit -m 'release: publish Electimes Office 1.0.12 compact print-dialog update'
+          git push origin HEAD:main
+          if ($LASTEXITCODE -ne 0) { throw 'Automatic update channel publication failed' }
