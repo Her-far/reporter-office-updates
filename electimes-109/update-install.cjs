@@ -67,7 +67,7 @@ async function runCase(legacy){
   },'restarted app window',60000);
   assert.match(window.MainWindowTitle,/전기신문|Electimes/);entry.restartedWindow=window.MainWindowTitle;entry.profilePreserved=true;
   console.log(JSON.stringify(entry));
- }catch(e){entry.error=String(e);throw e}
+ }catch(e){entry.error=String(e);if(app&&child?.exitCode===null)try{entry.ui=await app.firstWindow().then(p=>p.locator('body').innerText());entry.cacheFiles=fs.readdirSync(logsDir)}catch{}throw e}
  finally{
   if(app&&child?.exitCode===null)await require('./close-app.cjs')(app).catch(()=>{});
   const dataLogs=logsDir||path.join(profile,'electimes-updates');

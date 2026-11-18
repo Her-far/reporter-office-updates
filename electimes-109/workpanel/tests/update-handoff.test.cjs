@@ -6,7 +6,7 @@ function fixture(mode='ready'){
  let ready,commit;
  const module={exports:{}};
  vm.runInNewContext(source,{module,Buffer,process,setTimeout,require:name=>name==='node:child_process'?{spawn(_command,args){
-  const script=Buffer.from(args.at(-1),'base64').toString('utf16le');
+  assert.equal(args.at(-2),'-File');const script=fs.readFileSync(args.at(-1),'utf8');
   ready=script.match(/WriteAllText\('([^']+)'/)[1];commit=script.match(/Test-Path -LiteralPath '([^']+)'/)[1];
   if(mode==='ready')setTimeout(()=>fs.writeFileSync(ready,'ready'),5);else setTimeout(()=>child.emit('error',Error('helper unavailable')),5);
   return child;
