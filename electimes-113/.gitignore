@@ -11,3 +11,7 @@ patch-payload/
 *-windows.json
 windows-smoke.json
 payload-manifest.json
+qa-tools/
+qa-app/
+qa-live/
+dist/

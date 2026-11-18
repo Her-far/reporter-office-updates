@@ -1,12 +1,17 @@
 'use strict';
 // 1.0.13 overlay on the verified, published 1.0.12 payload: the CLI launcher/profile
-// correction and web AI (ChatGPT, Claude, Gemini) in the work panel. Usage: node build.cjs <extracted-1.0.12-installer> <new-stage-dir>
+// correction and web AI (ChatGPT, Claude, Gemini) in the work panel.
+// Usage: node build.cjs <extracted-1.0.12-installer> <new-stage-dir> [test-label, e.g. test.1]
 const fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), vm = require('node:vm');
 const asar = require('../electimes-109/workpanel/build/asar-tools.cjs');
 const { patchCli, CLI_FILES } = require('./cli-profile.cjs');
 
 const BASE_ASAR_SHA256 = '07a6eaff72dd557c59e18ed67efda7ed96003474ed41b9b883db0aa94ff9b6e8';
 const FROM = { version: '1.0.12', build: 112 }, TO = { version: '1.0.13', build: 113 };
+// A test build shows its label (Settings, install notes); application code stays 1.0.13.
+const label = process.argv[4] || '';
+if (label && !/^test\.\d{1,3}$/.test(label)) throw Error('Test label must look like test.1');
+const shown = label ? `${TO.version}-${label}` : TO.version;
 
 const base = path.resolve(process.argv[2] || ''), out = path.resolve(process.argv[3] || '');
 if (!process.argv[2] || !process.argv[3]) throw Error('Usage: node build.cjs <base-installer> <stage>');
@@ -69,9 +74,10 @@ for (const module of fs.readdirSync(path.join(out, 'resources/modules'))) {
     fs.writeFileSync(file, replaceHost(fs.readFileSync(file, 'utf8'))); modulePreloads.push(path.relative(out, file).split(path.sep).join('/')); }
 }
 
-fs.writeFileSync(path.join(out, 'resources/electimes-version.json'), JSON.stringify(TO));
+fs.writeFileSync(path.join(out, 'resources/electimes-version.json'), JSON.stringify({ version: shown, build: TO.build }));
 fs.writeFileSync(path.join(out, 'ELECTIMES-INSTALL.txt'),
-  exact(fs.readFileSync(path.join(out, 'ELECTIMES-INSTALL.txt'), 'utf8'), '전기신문 Office 1.0.12', '전기신문 Office 1.0.13') +
+  exact(fs.readFileSync(path.join(out, 'ELECTIMES-INSTALL.txt'), 'utf8'), '전기신문 Office 1.0.12', '전기신문 Office ' + shown) +
+  (label ? '\n이 설치판은 시험판입니다. 원래대로 돌아가려면 정식 1.0.12 전체 설치판을 다시 설치하세요. 문서와 설정은 유지됩니다.\n' : '') +
   '\n업무 패널에 ‘웹 AI’를 추가했습니다. ChatGPT·Claude·Gemini 공식 웹사이트를 패널에서 본인 계정으로 쓸 수 있습니다.\n명령줄 도구(ieumoffice)가 전기신문 Office 실행 파일과 사용자 데이터 폴더를 사용하도록 수정했습니다.\n');
 
 const changed = new Set(['resources/app.asar', 'resources/electimes-version.json', 'ELECTIMES-INSTALL.txt', 'BUILD-VERIFICATION.json',
@@ -83,7 +89,7 @@ for (const file of walk(path.join(base, 'resources'))) {
   if (sha(fs.readFileSync(file)) !== sha(fs.readFileSync(path.join(out, rel)))) throw Error('Unrelated resource changed: ' + rel); preserved++;
 }
 const report = {
-  version: TO.version, baseVersion: FROM.version, modifiedAsarEntries: [...replacements.keys()],
+  version: shown, build: TO.build, baseVersion: FROM.version, modifiedAsarEntries: [...replacements.keys()],
   modifiedResources: [...CLI_FILES.map(f => 'resources/cli/' + f), ...modulePreloads], preservedResources: preserved,
   asarSha256: sha(fs.readFileSync(path.join(out, 'resources/app.asar'))), baseAsarSha256: sha(original),
   cliSha256: Object.fromEntries(CLI_FILES.map(f => [f, sha(fs.readFileSync(path.join(cliDir, f)))])),

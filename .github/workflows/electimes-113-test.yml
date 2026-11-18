@@ -1,0 +1,96 @@
+name: Electimes Office 1.0.13 TEST installer (web AI)
+# Test build only: uploads a workflow artifact. Does not create a release,
+# change electimes-latest.json or touch the published 1.0.12 assets.
+on:
+  push:
+    branches: [claude/patch-kg1cyt]
+    paths: ['.github/workflows/electimes-113-test.yml', 'electimes-113/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: electimes-113-test-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  BASE_URL: https://github.com/Her-far/reporter-office-updates/releases/download/electimes-v1.0.12/ElectimesOffice-Setup-1.0.12-x64.exe
+  BASE_SHA256: 8060e3e6e89bf33aed3d3a99fa00d1ea8e85cba22d42c3bc6693b47a38604431
+  LABEL: test.${{ github.run_number }}
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 40
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: electimes-113
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Unit tests
+        run: |
+          node --test workpanel/tests/ai-web.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Unit tests failed' }
+      - name: Build the 1.0.13 test stage on the verified published 1.0.12
+        run: |
+          curl.exe --fail --location --retry 3 -o base.exe $env:BASE_URL
+          if ($LASTEXITCODE -ne 0) { throw 'Base download failed' }
+          if ((Get-FileHash base.exe -Algorithm SHA256).Hash.ToLower() -ne $env:BASE_SHA256) { throw 'Base release checksum mismatch' }
+          & 'C:\Program Files\7-Zip\7z.exe' x base.exe -obase-installer -y | Out-Null
+          if ($LASTEXITCODE -ne 0) { throw 'Base extraction failed' }
+          node build.cjs base-installer stage $env:LABEL
+          if ($LASTEXITCODE -ne 0) { throw 'Overlay build failed' }
+      - name: Package the test installer
+        run: |
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          python package-test.py stage $env:LABEL dist
+          if ($LASTEXITCODE -ne 0) { throw 'Installer packaging failed' }
+      - name: Install over 1.0.12, verify, start, and return to 1.0.12
+        run: |
+          $exe = (Get-ChildItem dist/ElectimesOffice-Setup-*.exe).FullName
+          ./smoke-test.ps1 -Installer $exe -Base base.exe -Manifest dist/payload-manifest.json -Version "1.0.13-$env:LABEL"
+      - name: Web AI panel test on Windows (stand-in pages)
+        run: |
+          npm install --prefix qa-tools --no-save --no-audit --no-fund electron@43.7.6 playwright-core@1.62.1
+          if ($LASTEXITCODE -ne 0) { throw 'Test tools installation failed' }
+          $env:ELECTRON_BINARY = (Resolve-Path qa-tools/node_modules/electron/dist/electron.exe).Path
+          $env:PLAYWRIGHT_MODULE = (Resolve-Path qa-tools/node_modules/playwright-core).Path
+          $env:WORKPANEL_PAYLOAD = (Resolve-Path stage).Path
+          $env:WORKPANEL_QA_DIR = Join-Path (Get-Location) 'qa-app'
+          node workpanel/tests/ai-web-app.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Web AI panel test failed' }
+      - name: Open the real ChatGPT, Claude, Gemini pages (evidence only)
+        continue-on-error: true
+        run: |
+          $env:ELECTRON_BINARY = (Resolve-Path qa-tools/node_modules/electron/dist/electron.exe).Path
+          $env:PLAYWRIGHT_MODULE = (Resolve-Path qa-tools/node_modules/playwright-core).Path
+          $env:WORKPANEL_PAYLOAD = (Resolve-Path stage).Path
+          $env:WORKPANEL_QA_DIR = Join-Path (Get-Location) 'qa-live'
+          node workpanel/tests/ai-web-live.cjs
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ElectimesOffice-1.0.13-${{ env.LABEL }}
+          retention-days: 30
+          compression-level: 0
+          path: |
+            electimes-113/dist/ElectimesOffice-Setup-*.exe
+            electimes-113/dist/ElectimesOffice-SHA256SUMS-*.txt
+            electimes-113/dist/package-test.json
+            electimes-113/stage/BUILD-VERIFICATION.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-113-test-reports-${{ env.LABEL }}
+          retention-days: 30
+          path: |
+            electimes-113/windows-smoke.json
+            electimes-113/startup-*.txt
+            electimes-113/qa-app/*.png
+            electimes-113/qa-app/results.json
+            electimes-113/qa-live/*.png
+            electimes-113/qa-live/live-report.json

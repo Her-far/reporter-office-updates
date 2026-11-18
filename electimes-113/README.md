@@ -89,3 +89,26 @@ Windows: sign-in to ChatGPT, Claude and Gemini in the panel and with Edge;
 
 Not included yet: installer packaging (NSIS), cumulative update, workflow and
 feed. The bundled ieumoffice SKILL.md still names IeumOffice in its prose.
+
+## Test installer
+
+`.github/workflows/electimes-113-test.yml` (push to this branch, or run by hand)
+builds a **test** full installer `ElectimesOffice-Setup-1.0.13-test.N-x64.exe`
+on Windows and uploads it as a workflow artifact. It does not create a release
+or change `electimes-latest.json`.
+
+```
+node build.cjs <extracted-1.0.12-installer> <stage> test.N
+python package-test.py <stage> test.N <dist>
+./smoke-test.ps1 -Installer <exe> -Base <1.0.12 exe> -Manifest <dist>/payload-manifest.json -Version 1.0.13-test.N
+```
+
+The test build reports `{"version":"1.0.13-test.N","build":113}`; application
+code is 1.0.13. The Windows job installs it over the published 1.0.12, checks
+every installed file against the stage, the registration and real startup,
+then reinstalls the published 1.0.12 to confirm the way back. It also runs the
+web AI panel test on Windows and opens the real three pages without an account
+(screenshots only; a CI address may get bot checks).
+
+Because the test build is build 113, an official release after it should use
+build 114 or later, or testers reinstall with the official full installer.
