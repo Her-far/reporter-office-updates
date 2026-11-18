@@ -16,3 +16,6 @@ payload-manifest.json
 native-*.hwp
 startup-*.txt
 probe-data/
+
+__pycache__/
+*.pyc

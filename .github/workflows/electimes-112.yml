@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   windows:
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
@@ -40,6 +40,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Base extraction failed' }
           node build.cjs base-installer stage
           if ($LASTEXITCODE -ne 0) { throw 'Overlay preservation failed' }
+          python rebuild.py --snapshot
+          if ($LASTEXITCODE -ne 0) { throw 'Payload snapshot failed' }
       - name: Verify native print dialog, cancellation, restored DPI and PDF page size
         timeout-minutes: 8
         working-directory: electimes-112
