@@ -1,0 +1,17 @@
+downloads/
+__pycache__/
+stage/
+baseline/
+client-archives/
+patch-payload/
+package/
+patch-check/
+node_modules/
+package-lock.json
+*.exe
+payload-manifest.json
+comparison.json
+electimes-latest.json
+*-windows.json
+*-SHA256SUMS.txt
+startup-*.txt

@@ -1,0 +1,52 @@
+name: Validate Electimes Office 1.0.12 cumulative update
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/electimes-112-cumulative.yml', 'electimes-112-cumulative/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: electimes-production-release
+  cancel-in-progress: false
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Package cumulative differences from every supported published installer
+        working-directory: electimes-112-cumulative
+        shell: pwsh
+        run: |
+          choco install nsis --yes --no-progress
+          if ($LASTEXITCODE -ne 0) { throw 'NSIS installation failed' }
+          $env:MAKENSIS = 'C:\Program Files (x86)\NSIS\makensis.exe'
+          $env:SEVENZIP = 'C:\Program Files\7-Zip\7z.exe'
+          python package.py
+          if ($LASTEXITCODE -ne 0) { throw 'Cumulative package validation failed' }
+      - name: Verify the updater actually shipped in each supported version
+        working-directory: electimes-112-cumulative
+        shell: pwsh
+        run: |
+          node verify-selection.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Production client selects the wrong package' }
+      - name: Install over all eight versions and verify unchanged final payload
+        working-directory: electimes-112-cumulative
+        shell: pwsh
+        run: ./smoke.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: electimes-112-cumulative-validation
+          path: |
+            electimes-112-cumulative/*-windows.json
+            electimes-112-cumulative/comparison.json
+            electimes-112-cumulative/payload-manifest.json
+            electimes-112-cumulative/electimes-latest.json
+            electimes-112-cumulative/*Cumulative*.exe
+            electimes-112-cumulative/*SHA256SUMS.txt
+            electimes-112-cumulative/startup-*.txt
