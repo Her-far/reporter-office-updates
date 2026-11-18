@@ -1,0 +1,30 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict'),{_electron}=require('playwright');
+const {bodyOf}=require('./workpanel/src/mail-reader.cjs');
+const root=__dirname,profile=fs.mkdtempSync(path.join(os.tmpdir(),'electimes-mail-links-'));let app;
+const report={version:'1.0.9',nativePackaged:true,syntheticMail:true};
+(async()=>{
+ app=await _electron.launch({executablePath:path.join(root,'stage/Electimes Office.exe'),args:[`--user-data-dir=${profile}`],env:{...process.env,GENOFFICE_NO_SPARE_VIEW:'1'},timeout:60000});
+ const home=await app.firstWindow();await home.waitForFunction(()=>window.aiOffice,{timeout:45000});
+ const body=bodyOf({html:'<table><tr><td><a href="https://example.com/file?id=1" onclick="alert(1)">보도자료.pdf</a></td><td>1.2 MB</td></tr></table><a href="https://example.com/source">원문 보기</a><script>parent.hacked=true</script><img src="https://tracker.invalid/pixel">'});
+ await app.evaluate(async({app,BrowserWindow,ipcMain},body)=>{
+  globalThis.__mailLinkActions=[];
+  const state={menu:'mail',prefs:{mailEnabled:true,mailDisplay:'reader',calendarView:'month',scheduleView:'week'},reader:{configured:true,email:'fixture@example.com'},downloadFolder:'D:\\취재자료',calendar:{},calendars:[],events:[],downloads:[],notes:[],mail:{}};
+  const message={uid:1,folder:'INBOX',validity:'1',key:'current-fixture',subject:'본문 파일 링크 확인',from:'fixture@example.com',to:'fixture@electimes.com',attachments:[],...body};
+  ipcMain.removeHandler('wp:action');ipcMain.handle('wp:action',(_event,p)=>{globalThis.__mailLinkActions.push(p);const a=p.action;let data={};if(a==='state')return {ok:true,state};if(a==='reader-folders')data=[{path:'INBOX',name:'받은메일함'}];if(a==='reader-list')data={items:[message],total:1,validity:'1'};if(a==='reader-read')data=message;if(a==='reader-link-save')data={id:'saved-file',name:'보도자료.pdf',folder:state.downloadFolder};return {ok:true,data};});
+  const folder=process.getBuiltinModule('path').join(app.getAppPath(),'out/main/work-panel');
+  const win=new BrowserWindow({width:650,height:850,webPreferences:{preload:folder+'/panel-preload.cjs',nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  await win.loadFile(folder+'/index.html');
+ },body);
+ const page=app.context().pages().find(p=>p.url().includes('work-panel/index.html'));assert(page);
+ await page.locator('.reader-card').first().click();await page.getByText('본문 파일 링크 1개',{exact:true}).waitFor();
+ const frame=page.frameLocator('.reader-body');await frame.getByRole('link',{name:'보도자료.pdf',exact:true}).click();
+ await page.getByRole('button',{name:'열기',exact:true}).waitFor();
+ let actions=await app.evaluate(()=>globalThis.__mailLinkActions);assert(actions.some(p=>p.action==='reader-link-save'&&p.value.key==='current-fixture'&&p.value.index===0));report.inlineAttachmentDownload=true;
+ await frame.getByRole('link',{name:'원문 보기',exact:true}).focus();await page.keyboard.press('Enter');
+ await page.waitForTimeout(300);actions=await app.evaluate(()=>globalThis.__mailLinkActions);assert(actions.some(p=>p.action==='reader-link'&&p.value.index===1));report.keyboardLinkActivation=true;
+ assert.equal(await frame.locator('script').count(),0);assert.equal(await frame.locator('a[href]').count(),0);assert.equal(await frame.locator('img[src^="https:"]').count(),0);
+ assert.equal(await page.locator('.reader-body').getAttribute('sandbox'),'allow-same-origin');assert.equal(await page.evaluate(()=>!!window.hacked),false);report.scriptlessBodyPreserved=true;
+ await page.getByRole('button',{name:'폴더',exact:true}).click();await page.waitForTimeout(200);actions=await app.evaluate(()=>globalThis.__mailLinkActions);assert(actions.some(p=>p.action==='download-show'&&p.value==='saved-file'));report.savedFileAccessible=true;
+ console.log(JSON.stringify(report));
+})().catch(e=>{report.error=String(e);console.error(e);process.exitCode=1}).finally(async()=>{fs.writeFileSync(path.join(root,'mail-links-windows.json'),JSON.stringify(report,null,2));try{await require('./close-app.cjs')(app)}catch(e){console.error(e);process.exitCode=1}});

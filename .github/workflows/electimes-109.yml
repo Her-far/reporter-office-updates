@@ -25,7 +25,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Test tools failed' }
           npm ci --ignore-scripts --prefix workpanel
           if ($LASTEXITCODE -ne 0) { throw 'Work panel dependencies failed' }
-          node --test workpanel/tests/core.test.cjs workpanel/tests/calendar-connect.test.cjs workpanel/tests/downloads.test.cjs workpanel/tests/mail-reader.test.cjs workpanel/tests/mail-reader-protocol.test.cjs workpanel/tests/notes.test.cjs workpanel/tests/migrate.test.cjs workpanel/tests/local-google-client.test.cjs
+          node --test workpanel/tests/core.test.cjs workpanel/tests/calendar-connect.test.cjs workpanel/tests/downloads.test.cjs workpanel/tests/mail-reader.test.cjs workpanel/tests/mail-reader-protocol.test.cjs workpanel/tests/linked-attachment.test.cjs workpanel/tests/notes.test.cjs workpanel/tests/migrate.test.cjs workpanel/tests/local-google-client.test.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Service regression failed' }
       - name: Build public source on production 1.0.6
         working-directory: electimes-109
@@ -74,6 +74,13 @@ jobs:
         run: |
           node find-focus.cjs
           if ($LASTEXITCODE -ne 0) { throw 'Find keyboard focus regression failed' }
+      - name: Verify clickable mail body attachments and keyboard links
+        timeout-minutes: 4
+        working-directory: electimes-109
+        shell: pwsh
+        run: |
+          node mail-links.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Mail file link regression failed' }
       - name: Verify update download waits for explicit restart
         timeout-minutes: 6
         working-directory: electimes-109
@@ -101,6 +108,7 @@ jobs:
           if ((Get-FileHash upgrade-base.exe -Algorithm SHA256).Hash.ToLower() -ne '9609f2d5358965083f2c6c9d0e846bf9e4ccf51bb747144bb6d6d54c9e6ff9bd') { throw 'Upgrade base checksum mismatch' }
           ./smoke.ps1
       - name: Publish verified installer and update channel
+        if: ${{ hashFiles('electimes-109/release-hold.txt') == '' }}
         working-directory: electimes-109
         shell: pwsh
         env:

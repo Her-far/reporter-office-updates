@@ -133,6 +133,11 @@ function register(deps){
           downloads.set(id,{id,name:saved.name,file:saved.file,status:'completed',bytes:item.content.length});
           data={id,name:saved.name,folder:root};
         }
+        else if(a==='reader-link-save'){
+          const url=reader.link(x?.key,x?.index),root=downloadRoot(),id=crypto.randomUUID();
+          const saved=await require('./linked-attachment.cjs').saveLinkedAttachment({url,name:x?.name,root});
+          downloads.set(id,{id,...saved,status:'completed'});data={id,name:saved.name,folder:root};
+        }
         else if(a==='reader-link'){await confirmExternal(reader.link(x?.key,x?.index));data={};}
         else throw Error('unknown-action');
         return {ok:true,data,reader:reader.status()};
