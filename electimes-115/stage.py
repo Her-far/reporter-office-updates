@@ -5,6 +5,8 @@ import base64,json,shutil,struct,sys
 base,out=map(Path,sys.argv[1:])
 if out.exists():raise SystemExit('Stage must be new')
 spec=json.loads(Path(__file__).with_name('changes.json').read_text())
+from menu_groups import integrate
+
 def digest(data): return sha256(data).hexdigest()
 def apply(name,data):
     patch=spec.pop(name)
@@ -12,7 +14,7 @@ def apply(name,data):
     for offset,removed,inserted in reversed(patch['edits']):
         data=data[:offset]+base64.b64decode(inserted,validate=True)+data[offset+removed:]
     assert digest(data)==patch['after'],name
-    return data
+    return integrate(name,data)
 shutil.copytree(base,out,ignore=shutil.ignore_patterns('$PLUGINSDIR','$pluginsdir','Uninstall.exe','uninstall.exe'))
 archive=out/'resources/app.asar'
 data=archive.read_bytes()

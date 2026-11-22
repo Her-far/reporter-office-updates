@@ -16,9 +16,11 @@ old_feed = json.loads((repo / 'electimes-latest.json').read_text(encoding='utf-8
 seven = os.environ.get('SEVENZIP', '7z')
 compiler = os.environ.get('MAKENSIS', 'makensis')
 version = '1.0.15'
-notes = ['기사입력 탭에 전기신문 CMS를 추가했습니다. 홈페이지 계정으로 로그인하고 패널 안에서 기존 CMS를 이용합니다.',
-         '홈 메뉴 전환 시 화면 위치와 한글 눈금자의 들여쓰기 표시·조절을 개선했습니다.',
-         '한글 본문 더블클릭 단어 선택과 DOCX 문자열을 표로 변환하는 기능을 수정했습니다.']
+notes = ['AI와 웹 AI를 하나의 AI 메뉴에 묶었습니다. 화살표에서 문서 AI와 웹 AI를 선택합니다.',
+         '기사 업무 메뉴에서 기자용 기사입력과 데스크용 기사관리를 전환합니다. 각 CMS 화면과 로그인 세션을 따로 유지합니다.',
+         '홈 메뉴 전환 시 화면 위치가 움직이던 현상과 한글 눈금자의 들여쓰기 표시 및 조절을 개선했습니다.',
+         '한글 본문에서 더블클릭으로 단어를 선택하는 동작을 수정했습니다.',
+         'DOCX에서 선택한 본문을 문자열을 표로 기능으로 변환할 수 있도록 수정했습니다.']
 def sha(p):
     with p.open('rb') as f:
         return hashlib.file_digest(f, 'sha256').hexdigest()
